@@ -38,7 +38,7 @@ class Database:
     def open(self, password: str) -> None:
         global _db_password
         _db_password = password
-        self._conn = sqlcipher.connect(str(self.path))
+        self._conn = sqlcipher.connect(str(self.path), check_same_thread=False)
         if ENCRYPTED:
             # Set encryption key — must be first pragma on a new/existing db
             self._conn.execute(f"PRAGMA key='{password}'")
