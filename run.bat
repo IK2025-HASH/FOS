@@ -1,56 +1,70 @@
 @echo off
 REM ═══════════════════════════════════════════════════════════════════════════
 REM  FOS — Multi-Company Accounting System
-REM  Setup and Build Script for Windows
+REM  Run this from Command Prompt to sync latest code and launch FOS.
 REM
-REM  First time:  double-click this file or run from command prompt
-REM  Thereafter:  run FOS.exe from the dist\ folder
+REM  First time:  double-click or run from Command Prompt
+REM  Every time after:  same — it pulls latest changes then starts the app
 REM ═══════════════════════════════════════════════════════════════════════════
 
 echo.
-echo  FOS — Setup and Build
-echo  =====================
+echo  FOS — Sync and Run
+echo  ==================
 echo.
+
+cd /d "%~dp0"
+
+REM ── Sync latest code from GitHub ─────────────────────────────────────────
+echo  Checking for latest updates from GitHub...
+git --version >nul 2>&1
+if errorlevel 1 (
+    echo  WARNING: Git not found — skipping update check.
+    echo  Install Git from https://git-scm.com if you want auto-updates.
+    echo.
+) else (
+    git pull origin claude/exciting-brahmagupta-lpIMW
+    if errorlevel 1 (
+        echo  WARNING: Could not pull latest code. Running with current version.
+        echo.
+    ) else (
+        echo  Code is up to date.
+        echo.
+    )
+)
 
 REM ── Check Python ─────────────────────────────────────────────────────────
 python --version >nul 2>&1
 if errorlevel 1 (
     echo  ERROR: Python not found.
-    echo  Install Python 3.11+ from https://python.org and ensure it is on your PATH.
+    echo  Install Python 3.11+ from https://python.org
+    echo  Make sure to tick "Add Python to PATH" during install.
     pause
     exit /b 1
 )
 
-echo  Python found. Installing dependencies...
+for /f "tokens=*" %%i in ('python --version') do echo  Found: %%i
 echo.
 
-REM ── Install dependencies ─────────────────────────────────────────────────
-pip install PyQt6 pandas openpyxl pdfplumber scikit-learn pyinstaller cryptography
+REM ── Install / update dependencies ────────────────────────────────────────
+echo  Installing dependencies (skipped if already up to date)...
+pip install --quiet PyQt6 pandas openpyxl pdfplumber scikit-learn cryptography
 
-REM ── SQLCipher — attempt install, note if it fails ────────────────────────
-echo.
-echo  Attempting sqlcipher3 install (encrypted database)...
-pip install sqlcipher3-binary
+REM ── SQLCipher (encrypted DB) — optional, graceful fallback ───────────────
+pip install --quiet sqlcipher3-binary >nul 2>&1
 if errorlevel 1 (
-    echo.
-    echo  NOTE: sqlcipher3 could not be installed automatically.
-    echo  FOS will run in UNENCRYPTED development mode.
-    echo  For production use, install sqlcipher3 manually.
-    echo  See: https://github.com/coleifer/sqlcipher3
-    echo.
+    pip install --quiet sqlcipher3 >nul 2>&1
 )
 
-REM ── Run directly (development mode) ──────────────────────────────────────
+echo  Dependencies ready.
 echo.
-echo  Starting FOS in development mode...
-echo  (Close this window to stop the application)
-echo.
-cd /d "%~dp0"
+
+REM ── Launch FOS ────────────────────────────────────────────────────────────
+echo  Starting FOS...
+echo  -------------------------------------------------------
 python app.py
 
-REM ── To build .exe instead, uncomment the lines below ─────────────────────
-REM echo  Building FOS.exe...
-REM pyinstaller fos.spec
-REM echo.
-REM echo  Done. Run: dist\FOS.exe
-REM pause
+if errorlevel 1 (
+    echo.
+    echo  FOS exited with an error. See messages above.
+    pause
+)
