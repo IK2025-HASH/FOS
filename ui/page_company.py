@@ -6,9 +6,9 @@ Company Profile page — list entities, create new, view detail.
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QComboBox, QCheckBox, QGroupBox, QScrollArea, QFrame,
-    QPushButton, QSplitter, QSpacerItem, QSizePolicy
+    QPushButton, QSplitter, QSpacerItem, QSizePolicy, QMenu
 )
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, QPoint
 
 from ui.widgets import (
     BasePage, Card, PrimaryButton, SecondaryButton,
@@ -133,18 +133,31 @@ class CompanyPage(BasePage):
         layout.addWidget(grp3)
 
         # ── Bank accounts ─────────────────────────────────────────────────────
-        grp4 = QGroupBox("Primary Bank Account (for CSV matching)")
+        grp4 = QGroupBox("Bank Accounts")
         grp4.setStyleSheet(self._grp_style())
         g4 = QVBoxLayout(grp4)
-        self.f_bk_name = LineField("e.g. Barclays Business Current")
-        self.f_bk_sort = LineField("e.g. 20-00-00")
-        self.f_bk_acc  = LineField("e.g. 12345678")
-        for lbl, w in [
-            ("Account Name",   self.f_bk_name),
-            ("Sort Code",      self.f_bk_sort),
-            ("Account Number", self.f_bk_acc),
-        ]:
-            g4.addLayout(FormRow(lbl, w))
+
+        note = QLabel("Add all bank accounts used by this company (used for CSV statement matching).")
+        note.setStyleSheet(f"color:{MUTED}; font-size:11px; font-style:italic;")
+        g4.addWidget(note)
+
+        add_row = QHBoxLayout()
+        self.f_bk_name = LineField("e.g. Barclays, Starling, HSBC, Monzo...")
+        self.btn_bk_add = SecondaryButton("+ Add")
+        self.btn_bk_add.clicked.connect(self._add_bank)
+        add_row.addWidget(self.f_bk_name)
+        add_row.addWidget(self.btn_bk_add)
+        g4.addLayout(add_row)
+
+        self.tbl_banks = make_table(["Bank Name"], stretch_col=0)
+        self.tbl_banks.setFixedHeight(110)
+        self.tbl_banks.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.tbl_banks.customContextMenuRequested.connect(self._remove_bank)
+        lbl_tip = QLabel("  Right-click a row to remove it.")
+        lbl_tip.setStyleSheet(f"color:{MUTED}; font-size:11px;")
+        g4.addWidget(lbl_tip)
+        g4.addWidget(self.tbl_banks)
+        self._bank_list = []
         layout.addWidget(grp4)
 
         # ── Approval authority ────────────────────────────────────────────────
@@ -174,6 +187,27 @@ class CompanyPage(BasePage):
         layout.addLayout(btn_row)
 
     # ── Slots ─────────────────────────────────────────────────────────────────
+
+    def _add_bank(self):
+        name = self.f_bk_name.text().strip()
+        if not name:
+            return
+        if name in self._bank_list:
+            error(self, "Duplicate", f"{name} is already in the list.")
+            return
+        self._bank_list.append(name)
+        set_row(self.tbl_banks, self.tbl_banks.rowCount(), [name])
+        self.f_bk_name.clear()
+
+    def _remove_bank(self, pos: QPoint):
+        row = self.tbl_banks.rowAt(pos.y())
+        if row < 0:
+            return
+        menu = QMenu(self)
+        act = menu.addAction("Remove")
+        if menu.exec(self.tbl_banks.viewport().mapToGlobal(pos)) == act:
+            self._bank_list.pop(row)
+            self.tbl_banks.removeRow(row)
 
     def _show_form(self):
         self.form_card.setVisible(True)
@@ -221,11 +255,7 @@ class CompanyPage(BasePage):
                 vat_scheme       = self.f_vat_scheme.currentText(),
                 flat_rate_pct    = float(self.f_flat_rate.text() or 0) or None,
                 quarter_start_month = int(self.f_vat_qstart.currentText()),
-                banks            = [dict(
-                    account_name   = self.f_bk_name.text().strip(),
-                    sort_code      = self.f_bk_sort.text().strip(),
-                    account_number = self.f_bk_acc.text().strip(),
-                )],
+                banks            = [{"account_name": b, "sort_code": "", "account_number": ""} for b in self._bank_list],
                 approver_name    = self.f_ap_name.text().strip(),
                 approver_role    = self.f_ap_role.text().strip(),
                 approver_email   = self.f_ap_email.text().strip(),
@@ -242,11 +272,12 @@ class CompanyPage(BasePage):
     def _clear_form(self):
         self.f_fy_start.setCurrentText("April")
         self.f_fy_end.setCurrentText("March")
+        self._bank_list.clear()
+        self.tbl_banks.setRowCount(0)
         for w in [self.f_legal, self.f_trading, self.f_comp_no,
                   self.f_r_line1, self.f_r_line2, self.f_r_town,
                   self.f_r_county, self.f_r_pc,
-                  self.f_vat_no, self.f_flat_rate,
-                  self.f_bk_name, self.f_bk_sort, self.f_bk_acc,
+                  self.f_vat_no, self.f_flat_rate, self.f_bk_name,
                   self.f_ap_name, self.f_ap_role, self.f_ap_email]:
             w.clear()
         self.f_vat_reg.setChecked(False)
