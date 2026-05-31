@@ -85,7 +85,7 @@ class AllocationEngine:
         return results
 
     def _allocate_one(self, tx: dict) -> dict:
-        from core.database import _uid as uid
+        from core.models import _uid as uid
         tx_id      = tx["tx_id"]
         desc       = str(tx.get("description","")).lower().strip()
         payee      = str(tx.get("payee","")).lower().strip()
