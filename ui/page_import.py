@@ -25,44 +25,66 @@ from core.ai_engine import AllocationEngine, confidence_band
 
 class ImportWorker(QThread):
     progress  = pyqtSignal(str)
-    finished  = pyqtSignal(int, int, list)   # tx_count, alloc_count, warnings
+    finished  = pyqtSignal(int, int, list)
     failed    = pyqtSignal(str)
 
-    def __init__(self, entity_id, filepath):
+    def __init__(self, entity_id, filepaths, bank_name):
         super().__init__()
-        self.entity_id = entity_id
-        self.filepath  = filepath
+        self.entity_id  = entity_id
+        self.filepaths  = filepaths   # list of file paths
+        self.bank_name  = bank_name
 
     def run(self):
+        # Open a dedicated DB connection for this thread
+        from core.database import open_thread_connection
+        thread_db = open_thread_connection()
+
+        # Monkey-patch models to use thread_db for this call
+        from core import models as _m
+        orig_db = _m.db
+        _m.db = thread_db
+
         try:
-            self.progress.emit("Parsing file…")
-            rows, fmt, warnings = parse_file(self.filepath)
-            if not rows:
-                self.failed.emit("No transactions found in file.")
-                return
+            total_staged = 0
+            total_allocs = 0
+            all_warnings = []
 
-            self.progress.emit(f"Found {len(rows)} rows ({fmt}). Staging…")
-            batch_id = ImportModel.create_batch(
-                self.entity_id,
-                os.path.basename(self.filepath),
-                fmt,
-                len(rows)
-            )
-            staged = ImportModel.stage_transactions(self.entity_id, batch_id, rows)
+            for fp in self.filepaths:
+                fname = os.path.basename(fp)
+                self.progress.emit(f"Parsing {fname}…")
+                rows, fmt, warnings = parse_file(fp)
+                if not rows:
+                    all_warnings.append(f"{fname}: no transactions found")
+                    continue
 
-            self.progress.emit(f"Running AI allocation on {staged} transactions…")
+                # Tag bank name into description prefix if provided
+                if self.bank_name:
+                    for r in rows:
+                        r["description"] = f"[{self.bank_name}] {r.get('description','')}"
+
+                self.progress.emit(f"{fname}: {len(rows)} rows found. Staging…")
+                batch_id = ImportModel.create_batch(
+                    self.entity_id, fname, fmt, len(rows)
+                )
+                staged = ImportModel.stage_transactions(self.entity_id, batch_id, rows)
+                total_staged += staged
+                all_warnings.extend(warnings)
+
+            self.progress.emit(f"Running AI allocation on {total_staged} transactions…")
             engine = AllocationEngine(self.entity_id)
-            engine.train()   # no-op if not enough history yet
-
+            engine.train()
             staged_txs = ImportModel.get_staged(self.entity_id)
-            # Only allocate unallocated ones from this batch
             unallocated = [t for t in staged_txs if t.get("account_code") is None]
             allocs = engine.allocate_batch(unallocated)
+            total_allocs = len(allocs)
 
             self.progress.emit("Done.")
-            self.finished.emit(staged, len(allocs), warnings)
+            self.finished.emit(total_staged, total_allocs, all_warnings)
         except Exception as exc:
             self.failed.emit(str(exc))
+        finally:
+            _m.db = orig_db
+            thread_db.close()
 
 
 # ── Page ──────────────────────────────────────────────────────────────────────
@@ -75,37 +97,51 @@ class ImportPage(BasePage):
                          "Load CSV, Excel, or PDF bank statements")
         self._entity_map: dict = {}
         self._worker = None
+        self._selected_files = []
         self._build()
 
     def _build(self):
-        # Entity + file selector
-        sel_card = Card("Select Company and File")
+        # ── File import card ──────────────────────────────────────────────────
+        sel_card = Card("Select Company and Files")
         sel_body = sel_card.body()
 
+        # Company selector
         row1 = QHBoxLayout()
         lbl_e = QLabel("Company:")
         lbl_e.setStyleSheet(f"color:{TEXT}; font-size:13px;")
         self.cbo_entity = ComboField(["— select company —"])
         self.cbo_entity.setMinimumWidth(280)
+        self.cbo_entity.currentIndexChanged.connect(self._on_entity_changed)
         row1.addWidget(lbl_e)
         row1.addWidget(self.cbo_entity)
         row1.addStretch()
         sel_body.addLayout(row1)
 
+        # Bank account selector (populated when company chosen)
+        row_bank = QHBoxLayout()
+        lbl_bank = QLabel("Bank Account:")
+        lbl_bank.setStyleSheet(f"color:{TEXT}; font-size:13px;")
+        self.cbo_bank = ComboField(["— select company first —"])
+        self.cbo_bank.setMinimumWidth(280)
+        row_bank.addWidget(lbl_bank)
+        row_bank.addWidget(self.cbo_bank)
+        row_bank.addStretch()
+        sel_body.addLayout(row_bank)
+
+        # File picker
         row2 = QHBoxLayout()
-        self.lbl_file = QLabel("No file selected")
-        self.lbl_file.setStyleSheet(f"color:{MUTED}; font-size:13px;")
+        self.lbl_files = QLabel("No files selected")
+        self.lbl_files.setStyleSheet(f"color:{MUTED}; font-size:13px;")
         self.btn_browse = SecondaryButton("Browse…")
         self.btn_browse.clicked.connect(self._browse)
-        row2.addWidget(self.lbl_file)
+        row2.addWidget(self.lbl_files)
         row2.addStretch()
         row2.addWidget(self.btn_browse)
         sel_body.addLayout(row2)
 
-        # Supported formats note
         note = QLabel(
             "Supported formats: CSV (Barclays, HSBC, Lloyds, NatWest, Starling, Monzo, generic)  "
-            "|  Excel .xlsx/.xls  |  PDF (table-based bank exports)"
+            "|  Excel .xlsx/.xls  |  PDF (table-based bank exports)  —  You can select multiple files at once."
         )
         note.setStyleSheet(f"color:{MUTED}; font-size:11px; font-style:italic;")
         note.setWordWrap(True)
@@ -118,7 +154,7 @@ class ImportPage(BasePage):
 
         self.layout_.addWidget(sel_card)
 
-        # Progress
+        # ── Progress card ─────────────────────────────────────────────────────
         prog_card = Card("Import Progress")
         self.lbl_progress = QLabel("Ready.")
         self.lbl_progress.setStyleSheet(f"color:{TEXT}; font-size:13px;")
@@ -133,7 +169,7 @@ class ImportPage(BasePage):
         prog_card.body().addWidget(self.progress_bar)
         self.layout_.addWidget(prog_card)
 
-        # Recent imports
+        # ── Recent imports ────────────────────────────────────────────────────
         hist_card = Card("Recent Imports")
         self.tbl_hist = make_table(
             ["Company", "Filename", "Type", "Rows", "Time", "Status"],
@@ -143,20 +179,19 @@ class ImportPage(BasePage):
         hist_card.body().addWidget(self.tbl_hist)
         self.layout_.addWidget(hist_card)
 
-        # ── Manual entry — personal / cash payments ───────────────────────────
+        # ── Manual entry card ─────────────────────────────────────────────────
         manual_card = Card("Manual Entry — Personal Account / Cash Payment")
         mb = manual_card.body()
 
-        note = QLabel(
+        note2 = QLabel(
             "Use this for business expenses paid from your personal bank account, "
             "credit card, or petty cash. They will be staged for AI allocation "
             "alongside your bank imports."
         )
-        note.setStyleSheet(f"color:{MUTED}; font-size:12px; font-style:italic;")
-        note.setWordWrap(True)
-        mb.addWidget(note)
+        note2.setStyleSheet(f"color:{MUTED}; font-size:12px; font-style:italic;")
+        note2.setWordWrap(True)
+        mb.addWidget(note2)
 
-        # Company selector (separate from file import selector)
         row_e = QHBoxLayout()
         lbl_me = QLabel("Company:")
         lbl_me.setStyleSheet(f"color:{TEXT}; font-size:13px;")
@@ -167,17 +202,13 @@ class ImportPage(BasePage):
         row_e.addStretch()
         mb.addLayout(row_e)
 
-        # Entry fields
         self.f_m_date   = LineField(str(date.today()))
         self.f_m_amount = LineField("e.g. -45.00  (negative = expense, positive = income)")
         self.f_m_desc   = LineField("e.g. Stationery from Staples")
         self.f_m_payee  = LineField("e.g. Staples")
         self.f_m_source = ComboField([
-            "Personal Account",
-            "Personal Credit Card",
-            "Petty Cash",
-            "Cash",
-            "Director Card",
+            "Personal Account", "Personal Credit Card",
+            "Petty Cash", "Cash", "Director Card",
         ])
 
         for lbl, w in [
@@ -200,18 +231,15 @@ class ImportPage(BasePage):
         btn_row.addWidget(self.btn_submit_manual)
         mb.addLayout(btn_row)
 
-        # Queue table
         self.tbl_manual = make_table(
             ["Date", "Amount", "Description", "Payee", "Source"], stretch_col=2
         )
         self.tbl_manual.setFixedHeight(160)
         mb.addWidget(self.tbl_manual)
-        self._manual_queue = []   # list of dicts
+        self._manual_queue = []
 
         self.layout_.addWidget(manual_card)
-
         self.layout_.addStretch()
-        self._selected_file = None
         self.refresh_entities()
 
     # ── Slots ─────────────────────────────────────────────────────────────────
@@ -231,31 +259,59 @@ class ImportPage(BasePage):
                     self._entity_map[e["legal_name"]] = e["entity_id"]
             cbo.blockSignals(False)
 
+    def _on_entity_changed(self):
+        entity_id = self._entity_map.get(self.cbo_entity.currentText())
+        self.cbo_bank.blockSignals(True)
+        self.cbo_bank.clear()
+        if entity_id:
+            from core.database import db
+            banks = db.fetchall(
+                "SELECT account_name FROM entity_banks WHERE entity_id=? ORDER BY is_primary DESC",
+                (entity_id,)
+            )
+            if banks:
+                for b in banks:
+                    self.cbo_bank.addItem(b["account_name"])
+            else:
+                self.cbo_bank.addItem("— no banks set up —")
+        else:
+            self.cbo_bank.addItem("— select company first —")
+        self.cbo_bank.blockSignals(False)
+        self._check_ready()
+
     def _browse(self):
-        fp, _ = QFileDialog.getOpenFileName(
-            self, "Select Bank Statement",
+        fps, _ = QFileDialog.getOpenFileNames(
+            self, "Select Bank Statements",
             "", "Bank Statements (*.csv *.xlsx *.xls *.pdf);;All Files (*)"
         )
-        if fp:
-            self._selected_file = fp
-            self.lbl_file.setText(os.path.basename(fp))
-            self.lbl_file.setStyleSheet(f"color:{TEXT}; font-size:13px;")
+        if fps:
+            self._selected_files = fps
+            if len(fps) == 1:
+                self.lbl_files.setText(os.path.basename(fps[0]))
+            else:
+                self.lbl_files.setText(f"{len(fps)} files selected")
+            self.lbl_files.setStyleSheet(f"color:{TEXT}; font-size:13px;")
             self._check_ready()
 
     def _check_ready(self):
         entity = self._entity_map.get(self.cbo_entity.currentText())
-        self.btn_import.setEnabled(bool(entity and self._selected_file))
+        self.btn_import.setEnabled(bool(entity and self._selected_files))
 
     def _run_import(self):
         entity_id = self._entity_map.get(self.cbo_entity.currentText())
-        if not entity_id or not self._selected_file:
+        if not entity_id or not self._selected_files:
             return
+
+        bank_name = self.cbo_bank.currentText()
+        if bank_name in ("— no banks set up —", "— select company first —"):
+            bank_name = ""
 
         self.btn_import.setEnabled(False)
         self.progress_bar.setVisible(True)
+        self.lbl_progress.setStyleSheet(f"color:{TEXT}; font-size:13px;")
         self.lbl_progress.setText("Starting import…")
 
-        self._worker = ImportWorker(entity_id, self._selected_file)
+        self._worker = ImportWorker(entity_id, self._selected_files, bank_name)
         self._worker.progress.connect(self._on_progress)
         self._worker.finished.connect(self._on_done)
         self._worker.failed.connect(self._on_error)
@@ -267,6 +323,9 @@ class ImportPage(BasePage):
     def _on_done(self, tx_count: int, alloc_count: int, warnings: list):
         self.progress_bar.setVisible(False)
         self.btn_import.setEnabled(True)
+        self._selected_files = []
+        self.lbl_files.setText("No files selected")
+        self.lbl_files.setStyleSheet(f"color:{MUTED}; font-size:13px;")
         msg = f"✓  Import complete — {tx_count} transactions staged, {alloc_count} AI allocations made."
         if warnings:
             msg += f"  ({len(warnings)} warnings)"
@@ -282,9 +341,9 @@ class ImportPage(BasePage):
         self.lbl_progress.setStyleSheet(f"color:{DANGER}; font-size:13px;")
 
     def _add_manual_row(self):
-        date_val = self.f_m_date.text().strip()
+        date_val   = self.f_m_date.text().strip()
         amount_str = self.f_m_amount.text().strip()
-        desc = self.f_m_desc.text().strip()
+        desc       = self.f_m_desc.text().strip()
         if not date_val or not amount_str or not desc:
             error(self, "Validation", "Date, Amount and Description are required.")
             return
@@ -304,13 +363,8 @@ class ImportPage(BasePage):
         self._manual_queue.append(row)
         i = self.tbl_manual.rowCount()
         set_row(self.tbl_manual, i, [
-            date_val,
-            f"£{amount:,.2f}",
-            desc,
-            row["payee"],
-            row["source"],
+            date_val, f"£{amount:,.2f}", desc, row["payee"], row["source"]
         ])
-        # Clear entry fields for next row
         self.f_m_amount.clear()
         self.f_m_desc.clear()
         self.f_m_payee.clear()
@@ -323,27 +377,19 @@ class ImportPage(BasePage):
             return
         if not self._manual_queue:
             return
-
         try:
             batch_id = ImportModel.create_batch(
-                entity_id,
-                f"Manual entry — {date.today()}",
-                "MANUAL",
+                entity_id, f"Manual entry — {date.today()}", "MANUAL",
                 len(self._manual_queue)
             )
-            # Tag each row with its payment source in the description
-            rows_to_stage = []
-            for r in self._manual_queue:
-                rows_to_stage.append({
-                    "date":        r["date"],
-                    "amount":      r["amount"],
-                    "description": f"[{r['source']}] {r['description']}",
-                    "payee":       r["payee"],
-                })
+            rows_to_stage = [{
+                "date":        r["date"],
+                "amount":      r["amount"],
+                "description": f"[{r['source']}] {r['description']}",
+                "payee":       r["payee"],
+            } for r in self._manual_queue]
             ImportModel.stage_transactions(entity_id, batch_id, rows_to_stage)
 
-            # Run AI allocation
-            from core.ai_engine import AllocationEngine
             engine = AllocationEngine(entity_id)
             engine.train()
             staged_txs = ImportModel.get_staged(entity_id)
@@ -364,7 +410,6 @@ class ImportPage(BasePage):
 
     def _load_history(self):
         from core.database import db
-        from core.models import EntityModel
         batches = db.fetchall(
             """SELECT b.*, e.legal_name
                FROM import_batches b
@@ -374,7 +419,7 @@ class ImportPage(BasePage):
         self.tbl_hist.setRowCount(0)
         for i, b in enumerate(batches):
             set_row(self.tbl_hist, i, [
-                b.get("legal_name",""),
+                b.get("legal_name", ""),
                 b["filename"],
                 b["file_type"],
                 str(b["row_count"]),

@@ -36,6 +36,8 @@ class Database:
     # ── Connection ───────────────────────────────────────────────────────────
 
     def open(self, password: str) -> None:
+        global _db_password
+        _db_password = password
         self._conn = sqlcipher.connect(str(self.path))
         if ENCRYPTED:
             # Set encryption key — must be first pragma on a new/existing db
@@ -246,3 +248,11 @@ class Database:
 
 # ── Module-level singleton ───────────────────────────────────────────────────
 db = Database()
+_db_password: str = ""   # stored so worker threads can open their own connection
+
+
+def open_thread_connection() -> "Database":
+    """Open a fresh DB connection for use in a background thread."""
+    conn = Database()
+    conn.open(_db_password)
+    return conn
