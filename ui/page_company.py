@@ -37,7 +37,7 @@ class CompanyPage(BasePage):
         # Company list card
         list_card = Card("Registered Companies")
         self.tbl = make_table(
-            ["Legal Name", "Trading Name", "Type", "FY End", "Status"], stretch_col=0
+            ["Legal Name", "Trading Name", "Type", "FY Start", "FY End", "Status"], stretch_col=0
         )
         self.tbl.setFixedHeight(220)
         self.tbl.doubleClicked.connect(self._view_selected)
@@ -65,16 +65,20 @@ class CompanyPage(BasePage):
         self.f_trading    = LineField("Leave blank if same as legal name")
         self.f_comp_no    = LineField("e.g. 12345678")
         self.f_type       = ComboField(["Limited Company","Sole Trader","Partnership","LLP"])
-        self.f_fy_start   = LineField("e.g. 2024-04-01")
-        self.f_fy_end     = LineField("e.g. 2025-03-31")
+        _months = ["January","February","March","April","May","June",
+                   "July","August","September","October","November","December"]
+        self.f_fy_start   = ComboField(_months)
+        self.f_fy_start.setCurrentText("April")   # UK default
+        self.f_fy_end     = ComboField(_months)
+        self.f_fy_end.setCurrentText("March")     # UK default
 
         for lbl, w in [
             ("Legal Name *",       self.f_legal),
             ("Trading Name",       self.f_trading),
             ("Company Number",     self.f_comp_no),
             ("Entity Type *",      self.f_type),
-            ("Financial Year Start *", self.f_fy_start),
-            ("Financial Year End *",   self.f_fy_end),
+            ("FY Start Month *",   self.f_fy_start),
+            ("FY End Month *",     self.f_fy_end),
         ]:
             g1.addLayout(FormRow(lbl, w))
         layout.addWidget(grp1)
@@ -189,8 +193,8 @@ class CompanyPage(BasePage):
         if not self.f_legal.text().strip():
             error(self, "Validation", "Legal name is required.")
             return
-        if not self.f_fy_start.text().strip() or not self.f_fy_end.text().strip():
-            error(self, "Validation", "Financial year start and end are required.")
+        if not self.f_fy_start.currentText() or not self.f_fy_end.currentText():
+            error(self, "Validation", "Financial year start and end months are required.")
             return
         if not self.f_ap_name.text().strip() or not self.f_ap_role.text().strip():
             error(self, "Validation", "Approval authority name and role are required.")
@@ -202,8 +206,8 @@ class CompanyPage(BasePage):
                 trading_name     = self.f_trading.text().strip() or None,
                 company_number   = self.f_comp_no.text().strip(),
                 entity_type      = self.f_type.currentText(),
-                fy_start         = self.f_fy_start.text().strip(),
-                fy_end           = self.f_fy_end.text().strip(),
+                fy_start         = self.f_fy_start.currentText(),
+                fy_end           = self.f_fy_end.currentText(),
                 reg_address      = dict(
                     line1    = self.f_r_line1.text().strip(),
                     line2    = self.f_r_line2.text().strip(),
@@ -236,8 +240,9 @@ class CompanyPage(BasePage):
             error(self, "Error", str(exc))
 
     def _clear_form(self):
+        self.f_fy_start.setCurrentText("April")
+        self.f_fy_end.setCurrentText("March")
         for w in [self.f_legal, self.f_trading, self.f_comp_no,
-                  self.f_fy_start, self.f_fy_end,
                   self.f_r_line1, self.f_r_line2, self.f_r_town,
                   self.f_r_county, self.f_r_pc,
                   self.f_vat_no, self.f_flat_rate,
@@ -262,7 +267,8 @@ class CompanyPage(BasePage):
                 e["legal_name"],
                 e.get("trading_name") or "",
                 e["entity_type"],
-                "",           # fy_end — add if needed
+                e.get("fy_start") or "",
+                e.get("fy_end") or "",
                 e["status"],
             ])
 

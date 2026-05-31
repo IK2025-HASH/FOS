@@ -132,8 +132,8 @@ class EntityModel:
     @staticmethod
     def list_all() -> list:
         return db.fetchall(
-            "SELECT entity_id, legal_name, trading_name, entity_type, status "
-            "FROM entities ORDER BY legal_name"
+            "SELECT entity_id, legal_name, trading_name, entity_type, "
+            "fy_start, fy_end, status FROM entities ORDER BY legal_name"
         )
 
     @staticmethod
