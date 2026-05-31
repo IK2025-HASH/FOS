@@ -4,15 +4,16 @@ Import bank statement files (CSV / Excel / PDF) and run AI allocation.
 """
 
 import os
+from datetime import date
 from PyQt6.QtWidgets import (
     QHBoxLayout, QVBoxLayout, QLabel, QFileDialog,
-    QProgressBar, QWidget
+    QProgressBar, QWidget, QPushButton
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 
 from ui.widgets import (
     BasePage, Card, PrimaryButton, SecondaryButton,
-    ComboField, make_table, set_row,
+    ComboField, LineField, FormRow, make_table, set_row,
     info, error, ACCENT, DARK, TEXT, MUTED, WHITE, BG, SUCCESS, WARN, DANGER
 )
 from core.models import EntityModel, ImportModel
@@ -142,6 +143,73 @@ class ImportPage(BasePage):
         hist_card.body().addWidget(self.tbl_hist)
         self.layout_.addWidget(hist_card)
 
+        # ── Manual entry — personal / cash payments ───────────────────────────
+        manual_card = Card("Manual Entry — Personal Account / Cash Payment")
+        mb = manual_card.body()
+
+        note = QLabel(
+            "Use this for business expenses paid from your personal bank account, "
+            "credit card, or petty cash. They will be staged for AI allocation "
+            "alongside your bank imports."
+        )
+        note.setStyleSheet(f"color:{MUTED}; font-size:12px; font-style:italic;")
+        note.setWordWrap(True)
+        mb.addWidget(note)
+
+        # Company selector (separate from file import selector)
+        row_e = QHBoxLayout()
+        lbl_me = QLabel("Company:")
+        lbl_me.setStyleSheet(f"color:{TEXT}; font-size:13px;")
+        self.cbo_manual_entity = ComboField(["— select company —"])
+        self.cbo_manual_entity.setMinimumWidth(280)
+        row_e.addWidget(lbl_me)
+        row_e.addWidget(self.cbo_manual_entity)
+        row_e.addStretch()
+        mb.addLayout(row_e)
+
+        # Entry fields
+        self.f_m_date   = LineField(str(date.today()))
+        self.f_m_amount = LineField("e.g. -45.00  (negative = expense, positive = income)")
+        self.f_m_desc   = LineField("e.g. Stationery from Staples")
+        self.f_m_payee  = LineField("e.g. Staples")
+        self.f_m_source = ComboField([
+            "Personal Account",
+            "Personal Credit Card",
+            "Petty Cash",
+            "Cash",
+            "Director Card",
+        ])
+
+        for lbl, w in [
+            ("Date *",           self.f_m_date),
+            ("Amount (£) *",     self.f_m_amount),
+            ("Description *",    self.f_m_desc),
+            ("Payee",            self.f_m_payee),
+            ("Payment Source *", self.f_m_source),
+        ]:
+            mb.addLayout(FormRow(lbl, w))
+
+        btn_row = QHBoxLayout()
+        self.btn_add_manual = SecondaryButton("+ Add to Queue")
+        self.btn_add_manual.clicked.connect(self._add_manual_row)
+        self.btn_submit_manual = PrimaryButton("Submit Queue for AI Allocation")
+        self.btn_submit_manual.clicked.connect(self._submit_manual)
+        self.btn_submit_manual.setEnabled(False)
+        btn_row.addWidget(self.btn_add_manual)
+        btn_row.addStretch()
+        btn_row.addWidget(self.btn_submit_manual)
+        mb.addLayout(btn_row)
+
+        # Queue table
+        self.tbl_manual = make_table(
+            ["Date", "Amount", "Description", "Payee", "Source"], stretch_col=2
+        )
+        self.tbl_manual.setFixedHeight(160)
+        mb.addWidget(self.tbl_manual)
+        self._manual_queue = []   # list of dicts
+
+        self.layout_.addWidget(manual_card)
+
         self.layout_.addStretch()
         self._selected_file = None
         self.refresh_entities()
@@ -149,18 +217,19 @@ class ImportPage(BasePage):
     # ── Slots ─────────────────────────────────────────────────────────────────
 
     def refresh_entities(self):
-        self.cbo_entity.blockSignals(True)
-        self.cbo_entity.clear()
         self._entity_map = {}
         entities = EntityModel.list_all()
-        if not entities:
-            self.cbo_entity.addItem("— no companies yet —")
-        else:
-            self.cbo_entity.addItem("— select company —")
-            for e in entities:
-                self.cbo_entity.addItem(e["legal_name"])
-                self._entity_map[e["legal_name"]] = e["entity_id"]
-        self.cbo_entity.blockSignals(False)
+        for cbo in (self.cbo_entity, self.cbo_manual_entity):
+            cbo.blockSignals(True)
+            cbo.clear()
+            if not entities:
+                cbo.addItem("— no companies yet —")
+            else:
+                cbo.addItem("— select company —")
+                for e in entities:
+                    cbo.addItem(e["legal_name"])
+                    self._entity_map[e["legal_name"]] = e["entity_id"]
+            cbo.blockSignals(False)
 
     def _browse(self):
         fp, _ = QFileDialog.getOpenFileName(
@@ -211,6 +280,87 @@ class ImportPage(BasePage):
         self.btn_import.setEnabled(True)
         self.lbl_progress.setText(f"✗  {msg}")
         self.lbl_progress.setStyleSheet(f"color:{DANGER}; font-size:13px;")
+
+    def _add_manual_row(self):
+        date_val = self.f_m_date.text().strip()
+        amount_str = self.f_m_amount.text().strip()
+        desc = self.f_m_desc.text().strip()
+        if not date_val or not amount_str or not desc:
+            error(self, "Validation", "Date, Amount and Description are required.")
+            return
+        try:
+            amount = float(amount_str.replace(",", "").replace("£", ""))
+        except ValueError:
+            error(self, "Validation", "Amount must be a number, e.g. -45.00")
+            return
+
+        row = {
+            "date":        date_val,
+            "amount":      amount,
+            "description": desc,
+            "payee":       self.f_m_payee.text().strip(),
+            "source":      self.f_m_source.currentText(),
+        }
+        self._manual_queue.append(row)
+        i = self.tbl_manual.rowCount()
+        set_row(self.tbl_manual, i, [
+            date_val,
+            f"£{amount:,.2f}",
+            desc,
+            row["payee"],
+            row["source"],
+        ])
+        # Clear entry fields for next row
+        self.f_m_amount.clear()
+        self.f_m_desc.clear()
+        self.f_m_payee.clear()
+        self.btn_submit_manual.setEnabled(True)
+
+    def _submit_manual(self):
+        entity_id = self._entity_map.get(self.cbo_manual_entity.currentText())
+        if not entity_id:
+            error(self, "Validation", "Please select a company.")
+            return
+        if not self._manual_queue:
+            return
+
+        try:
+            batch_id = ImportModel.create_batch(
+                entity_id,
+                f"Manual entry — {date.today()}",
+                "MANUAL",
+                len(self._manual_queue)
+            )
+            # Tag each row with its payment source in the description
+            rows_to_stage = []
+            for r in self._manual_queue:
+                rows_to_stage.append({
+                    "date":        r["date"],
+                    "amount":      r["amount"],
+                    "description": f"[{r['source']}] {r['description']}",
+                    "payee":       r["payee"],
+                })
+            ImportModel.stage_transactions(entity_id, batch_id, rows_to_stage)
+
+            # Run AI allocation
+            from core.ai_engine import AllocationEngine
+            engine = AllocationEngine(entity_id)
+            engine.train()
+            staged_txs = ImportModel.get_staged(entity_id)
+            unallocated = [t for t in staged_txs if t.get("account_code") is None]
+            engine.allocate_batch(unallocated)
+
+            count = len(self._manual_queue)
+            self._manual_queue.clear()
+            self.tbl_manual.setRowCount(0)
+            self.btn_submit_manual.setEnabled(False)
+            self._load_history()
+            info(self, "Submitted",
+                 f"{count} manual transaction(s) staged for review.\n\n"
+                 "Go to AI Allocation to review and approve.")
+            self.import_done.emit()
+        except Exception as exc:
+            error(self, "Error", str(exc))
 
     def _load_history(self):
         from core.database import db
