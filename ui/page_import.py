@@ -35,15 +35,6 @@ class ImportWorker(QThread):
         self.bank_name  = bank_name
 
     def run(self):
-        # Open a dedicated DB connection for this thread
-        from core.database import open_thread_connection
-        thread_db = open_thread_connection()
-
-        # Monkey-patch models to use thread_db for this call
-        from core import models as _m
-        orig_db = _m.db
-        _m.db = thread_db
-
         try:
             total_staged = 0
             total_allocs = 0
@@ -82,9 +73,6 @@ class ImportWorker(QThread):
             self.finished.emit(total_staged, total_allocs, all_warnings)
         except Exception as exc:
             self.failed.emit(str(exc))
-        finally:
-            _m.db = orig_db
-            thread_db.close()
 
 
 # ── Page ──────────────────────────────────────────────────────────────────────
