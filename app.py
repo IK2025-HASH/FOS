@@ -51,25 +51,37 @@ def main():
     font = QFont("Segoe UI", 10)
     app.setFont(font)
 
-    # ── Master password ───────────────────────────────────────────────────────
-    is_new = not DB_PATH.exists()
-    dlg = UnlockDialog(is_new_db=is_new)
-    if dlg.exec() != UnlockDialog.DialogCode.Accepted:
-        sys.exit(0)
-
-    password = dlg.password()
-    try:
-        db.open(password)
-    except Exception as exc:
-        QMessageBox.critical(
-            None, "Cannot Open Database",
-            f"Failed to open the database.\n\n"
-            f"If this is an existing database, check your password.\n\n"
-            f"Error: {exc}"
-        )
-        sys.exit(1)
-
-    log.info("Database opened successfully (new_db=%s)", is_new)
+    # ── Dev mode: skip password, auto-open (delete corrupt db if needed) ─────
+    DEV_MODE = True   # set False when ready for production password prompt
+    if DEV_MODE:
+        if DB_PATH.exists():
+            try:
+                db.open("")
+            except Exception:
+                # Existing db is corrupt or encrypted — delete and start fresh
+                log.warning("Existing database unreadable — resetting for dev mode.")
+                DB_PATH.unlink()
+                db.open("")
+        else:
+            db.open("")
+        log.info("Dev mode: opened database without password")
+    else:
+        is_new = not DB_PATH.exists()
+        dlg = UnlockDialog(is_new_db=is_new)
+        if dlg.exec() != UnlockDialog.DialogCode.Accepted:
+            sys.exit(0)
+        password = dlg.password()
+        try:
+            db.open(password)
+        except Exception as exc:
+            QMessageBox.critical(
+                None, "Cannot Open Database",
+                f"Failed to open the database.\n\n"
+                f"If this is an existing database, check your password.\n\n"
+                f"Error: {exc}"
+            )
+            sys.exit(1)
+        log.info("Database opened successfully (new_db=%s)", is_new)
 
     # ── Main window ───────────────────────────────────────────────────────────
     win = MainWindow()
