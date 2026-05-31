@@ -21,7 +21,8 @@ except ImportError:
     import sqlite3 as sqlcipher
     ENCRYPTED = False
 
-DB_PATH = Path.home() / "AppData" / "Local" / "FOS" / "fos.db"
+DB_PATH = Path(os.environ.get("APPDATA", Path.home() / ".local" / "share")) / "FOS" / "fos.db"
+DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 
 class Database:

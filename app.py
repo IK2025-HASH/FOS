@@ -27,24 +27,22 @@ from ui.page_import import ImportPage
 from ui.page_allocation import AllocationPage
 from ui.page_gl import GLPage, TrialBalancePage
 
+import os
+_LOG_DIR = Path(os.environ.get("APPDATA", Path.home() / ".local" / "share")) / "FOS"
+_LOG_DIR.mkdir(parents=True, exist_ok=True)
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s  %(levelname)-7s  %(name)s — %(message)s",
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler(
-            Path.home() / "AppData" / "Local" / "FOS" / "fos.log",
-            encoding="utf-8"
-        )
+        logging.FileHandler(_LOG_DIR / "fos.log", encoding="utf-8")
     ]
 )
 log = logging.getLogger("fos.app")
 
 
 def main():
-    # Ensure log dir exists before logging to file
-    (Path.home() / "AppData" / "Local" / "FOS").mkdir(parents=True, exist_ok=True)
-
     app = QApplication(sys.argv)
     app.setApplicationName("FOS")
     app.setOrganizationName("Network Logic Limited")
