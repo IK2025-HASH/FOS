@@ -53,18 +53,22 @@ def main():
 
     # ── Dev mode: skip password, auto-open (delete corrupt db if needed) ─────
     DEV_MODE = True   # set False when ready for production password prompt
+    DEV_PASSWORD = "devpass"   # sqlcipher requires at least 1 character
     if DEV_MODE:
         if DB_PATH.exists():
             try:
-                db.open("")
+                db.open(DEV_PASSWORD)
             except Exception:
-                # Existing db is corrupt or encrypted — delete and start fresh
+                # Existing db is corrupt or from a different session — delete it
                 log.warning("Existing database unreadable — resetting for dev mode.")
-                DB_PATH.unlink()
-                db.open("")
+                try:
+                    DB_PATH.unlink()
+                except Exception:
+                    pass
+                db.open(DEV_PASSWORD)
         else:
-            db.open("")
-        log.info("Dev mode: opened database without password")
+            db.open(DEV_PASSWORD)
+        log.info("Dev mode: opened database without password prompt")
     else:
         is_new = not DB_PATH.exists()
         dlg = UnlockDialog(is_new_db=is_new)
