@@ -136,6 +136,14 @@ def main():
     import_pg.import_done.connect(on_import_done)
     alloc_pg.committed.connect(on_committed)
 
+    # ── Initial refresh so all dropdowns show existing companies ─────────────
+    coa_pg.refresh_entities()
+    import_pg.refresh_entities()
+    alloc_pg.refresh_entities()
+    gl_pg.refresh_entities()
+    tb_pg.refresh_entities()
+    dashboard.refresh()
+
     # ── Launch ────────────────────────────────────────────────────────────────
     win.navigate("dashboard")
     win.show()

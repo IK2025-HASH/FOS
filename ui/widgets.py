@@ -66,7 +66,7 @@ class BasePage(QWidget):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setStyleSheet(f"background:{BG};")
+        scroll.setStyleSheet(f"background:{BG}; color:{TEXT};")
 
         self.content = QWidget()
         self.content.setStyleSheet(f"background:{BG};")
@@ -200,10 +200,10 @@ def make_table(headers: list, stretch_col: int = -1) -> QTableWidget:
     t.setShowGrid(False)
     t.setStyleSheet(
         f"QTableWidget {{ border:1px solid {BORDER}; border-radius:6px; "
-        f"background:white; alternate-background-color:#F8FBFF; font-size:13px; }}"
+        f"background:white; alternate-background-color:#F8FBFF; font-size:13px; color:{TEXT}; }}"
         f"QHeaderView::section {{ background:{DARK}; color:white; "
         f"font-weight:bold; font-size:12px; padding:6px; border:none; }}"
-        f"QTableWidget::item {{ padding:4px 8px; }}"
+        f"QTableWidget::item {{ padding:4px 8px; color:{TEXT}; }}"
         f"QTableWidget::item:selected {{ background:{ACCENT}; color:white; }}"
     )
     hdr = t.horizontalHeader()
@@ -218,6 +218,7 @@ def set_row(table: QTableWidget, row: int, values: list,
     for col, val in enumerate(values):
         item = QTableWidgetItem(str(val))
         item.setTextAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
+        item.setForeground(QColor(TEXT))
         if row_colour:
             item.setBackground(QColor(row_colour))
         table.setItem(row, col, item)
