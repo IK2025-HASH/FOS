@@ -43,7 +43,7 @@ class Database:
             self._conn.execute("PRAGMA cipher_page_size=4096")
             self._conn.execute("PRAGMA kdf_iter=200000")
             self._conn.execute("PRAGMA cipher_hmac_algorithm=HMAC_SHA256")
-        self._conn.row_factory = sqlite3.Row
+        self._conn.row_factory = sqlcipher.Row if ENCRYPTED else sqlite3.Row
         self._conn.execute("PRAGMA foreign_keys=ON")
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._initialise_schema()
