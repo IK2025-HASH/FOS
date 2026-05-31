@@ -117,16 +117,21 @@ class ImportPage(BasePage):
         row1.addStretch()
         sel_body.addLayout(row1)
 
-        # Bank account selector (populated when company chosen)
+        # Bank account — editable so any name can be typed freely
         row_bank = QHBoxLayout()
         lbl_bank = QLabel("Bank Account:")
         lbl_bank.setStyleSheet(f"color:{TEXT}; font-size:13px;")
         self.cbo_bank = ComboField(["— select company first —"])
+        self.cbo_bank.setEditable(True)
         self.cbo_bank.setMinimumWidth(280)
+        self.cbo_bank.setPlaceholderText("Type or select bank name (e.g. Wise, Revolut…)")
+        tip = QLabel("Type any bank name — registered banks shown as suggestions")
+        tip.setStyleSheet(f"color:{MUTED}; font-size:11px; font-style:italic;")
         row_bank.addWidget(lbl_bank)
         row_bank.addWidget(self.cbo_bank)
         row_bank.addStretch()
         sel_body.addLayout(row_bank)
+        sel_body.addWidget(tip)
 
         # File picker
         row2 = QHBoxLayout()
@@ -269,13 +274,9 @@ class ImportPage(BasePage):
                 "SELECT account_name FROM entity_banks WHERE entity_id=? ORDER BY is_primary DESC",
                 (entity_id,)
             )
-            if banks:
-                for b in banks:
-                    self.cbo_bank.addItem(b["account_name"])
-            else:
-                self.cbo_bank.addItem("— no banks set up —")
-        else:
-            self.cbo_bank.addItem("— select company first —")
+            for b in banks:
+                self.cbo_bank.addItem(b["account_name"])
+        self.cbo_bank.setCurrentText("")   # clear so user types or picks
         self.cbo_bank.blockSignals(False)
         self._check_ready()
 
@@ -302,9 +303,7 @@ class ImportPage(BasePage):
         if not entity_id or not self._selected_files:
             return
 
-        bank_name = self.cbo_bank.currentText()
-        if bank_name in ("— no banks set up —", "— select company first —"):
-            bank_name = ""
+        bank_name = self.cbo_bank.currentText().strip()
 
         self.btn_import.setEnabled(False)
         self.progress_bar.setVisible(True)
