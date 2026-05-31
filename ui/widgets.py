@@ -168,6 +168,9 @@ def ComboField(options: list, width: int = 0) -> QComboBox:
         f"QComboBox {{ border:1px solid {BORDER}; border-radius:4px; "
         f"padding:0 10px; font-size:13px; background:white; color:{TEXT}; }}"
         f"QComboBox:focus {{ border:1px solid {ACCENT}; }}"
+        f"QComboBox QAbstractItemView {{ background:white; color:{TEXT}; "
+        f"selection-background-color:{ACCENT}; selection-color:white; "
+        f"border:1px solid {BORDER}; outline:none; }}"
     )
     return c
 
