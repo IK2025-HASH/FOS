@@ -1,0 +1,68 @@
+code,name,type,normal_balance,vat_applicable,vat_rate,system_locked
+1000,Bank — Current Account,Asset,Debit,No,,1
+1010,Bank — Savings / Reserve,Asset,Debit,No,,0
+1020,Petty Cash,Asset,Debit,No,,0
+1100,Trade Debtors,Asset,Debit,No,,1
+1110,Prepayments,Asset,Debit,No,,0
+1130,Stock / Inventory,Asset,Debit,No,,0
+1200,VAT Reclaim Receivable,Asset,Debit,No,,1
+1300,Fixed Assets — Equipment,Asset,Debit,No,,0
+1310,Fixed Assets — Vehicles,Asset,Debit,No,,0
+1320,Fixed Assets — Fixtures & Fittings,Asset,Debit,No,,0
+1330,Fixed Assets — Leasehold Improvements,Asset,Debit,No,,0
+1390,Accumulated Depreciation,Asset,Credit,No,,0
+2000,Trade Creditors,Liability,Credit,No,,1
+2100,VAT Liability,Liability,Credit,No,,1
+2110,VAT Control Account,Liability,Credit,No,,1
+2200,PAYE / NIC Payable,Liability,Credit,No,,0
+2210,Pension Payable,Liability,Credit,No,,0
+2300,Corporation Tax Provision,Liability,Credit,No,,0
+2400,Director Loan Account,Liability,Credit,No,,0
+2500,Bank Loan,Liability,Credit,No,,0
+2600,Accruals,Liability,Credit,No,,0
+3000,Share Capital,Equity,Credit,No,,1
+3100,Retained Earnings,Equity,Credit,No,,1
+3200,Owner Drawings,Equity,Debit,No,,0
+3300,Current Year Profit/Loss,Equity,Credit,No,,1
+4000,Sales — Standard Rated,Income,Credit,Yes,20.0,1
+4010,Sales — Zero Rated,Income,Credit,Yes,0.0,0
+4020,Sales — Exempt,Income,Credit,Exempt,,0
+4030,Sales — Outside Scope,Income,Credit,No,,0
+4100,Grant Income,Income,Credit,No,,0
+4200,Other Income,Income,Credit,No,,0
+4300,Interest Received,Income,Credit,No,,0
+5000,Direct Materials,CoS,Debit,Yes,20.0,0
+5010,Subcontractors,CoS,Debit,Yes,20.0,0
+5020,Direct Wages,CoS,Debit,No,,0
+5030,Carriage / Delivery,CoS,Debit,Yes,20.0,0
+5500,Rent and Rates,Overhead,Debit,Yes,20.0,0
+5510,Utilities,Overhead,Debit,Yes,20.0,0
+5520,Telephone and Internet,Overhead,Debit,Yes,20.0,0
+5530,Insurance,Overhead,Debit,Exempt,,0
+5540,Subscriptions and Software,Overhead,Debit,Yes,20.0,0
+5545,Office Supplies & Stationery,Overhead,Debit,Yes,20.0,0
+5550,Marketing and Advertising,Overhead,Debit,Yes,20.0,0
+5555,Postage & Couriers,Overhead,Debit,Yes,20.0,0
+5560,Travel and Accommodation,Overhead,Debit,Yes,20.0,0
+5565,Cleaning and Laundry,Overhead,Debit,Yes,20.0,0
+5570,Meals and Entertainment,Overhead,Debit,Yes,20.0,0
+5575,Client Entertainment,Overhead,Debit,Yes,20.0,0
+5576,Staff Training & Development,Overhead,Debit,Yes,20.0,0
+5577,Staff Welfare & Social Events,Overhead,Debit,Yes,20.0,0
+5580,Motor Expenses,Overhead,Debit,Yes,20.0,0
+5585,General Maintenance,Overhead,Debit,Yes,20.0,0
+5586,Equipment Hire / Leasing,Overhead,Debit,Yes,20.0,0
+5590,Professional Fees,Overhead,Debit,Yes,20.0,0
+5592,Subsistence,Overhead,Debit,Yes,20.0,0
+5595,Charitable Donations,Overhead,Debit,No,,0
+5600,Bank Charges and Interest,Overhead,Debit,Exempt,,0
+5610,Depreciation,Overhead,Debit,No,,0
+5620,Sundry Expenses,Overhead,Debit,Yes,20.0,0
+5630,Bad Debt Write-Off,Overhead,Debit,No,,0
+5700,Salaries and Wages,Overhead,Debit,No,,0
+5710,Employer NIC,Overhead,Debit,No,,0
+5720,Pension Contributions,Overhead,Debit,No,,0
+5730,Directors Remuneration,Overhead,Debit,No,,0
+6000,Corporation Tax Charge,Tax,Debit,No,,0
+6010,Deferred Tax,Tax,Debit,No,,0
+9000,Internal Bank Transfer,Asset,Debit,No,,1
