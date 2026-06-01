@@ -55,6 +55,8 @@ class CoAPage(BasePage):
         )
         self.cbo_type.currentIndexChanged.connect(self._load_coa)
 
+        self.btn_reseed  = SecondaryButton("↺  Restore Standard Accounts")
+        self.btn_reseed.clicked.connect(self._reseed_coa)
         self.btn_import = SecondaryButton("Import CoA (CSV/Excel)")
         self.btn_import.clicked.connect(self._import_coa)
         self.btn_add    = PrimaryButton("+ Add Account")
@@ -65,6 +67,7 @@ class CoAPage(BasePage):
         bar.addWidget(lbl_type)
         bar.addWidget(self.cbo_type)
         bar.addStretch()
+        bar.addWidget(self.btn_reseed)
         bar.addWidget(self.btn_import)
         bar.addWidget(self.btn_add)
         self.layout_.addLayout(bar)
@@ -148,6 +151,24 @@ class CoAPage(BasePage):
                 r["normal_balance"], r["vat_applicable"],
                 vat_rate, locked, active
             ], row_colour=fill if i % 2 == 0 else None)
+
+    # ── Reseed standard CoA ───────────────────────────────────────────────────
+
+    def _reseed_coa(self):
+        entity_id = self._current_entity_id()
+        if not entity_id:
+            error(self, "Select Company", "Please select a company first.")
+            return
+        if not confirm(self, "Restore Standard Accounts",
+                       "This will add any missing standard accounts back to this company's "
+                       "Chart of Accounts.\n\nExisting accounts will NOT be changed or deleted."):
+            return
+        try:
+            CoAModel.seed_standard(entity_id)
+            self._load_coa()
+            info(self, "Done", "Standard accounts restored successfully.")
+        except Exception as exc:
+            error(self, "Error", str(exc))
 
     # ── Import CoA ────────────────────────────────────────────────────────────
 
