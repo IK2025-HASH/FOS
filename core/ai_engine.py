@@ -92,6 +92,10 @@ class AllocationEngine:
         amount     = float(tx.get("amount", 0))
         combined   = f"{payee} {desc}".strip()
 
+        # 0. Internal transfer — payee/desc matches a known bank of this entity
+        if self._is_internal_transfer(combined):
+            return self._result(tx_id, "9000", "OS", 97.0, "internal_transfer")
+
         # 1. Rule library (user-created rules — highest priority)
         rule_match = self._match_rules(payee, desc)
         if rule_match:
@@ -248,6 +252,21 @@ class AllocationEngine:
              alloc["vat_code"], alloc["confidence"], alloc["method"],
              alloc["rule_id"], alloc["override"])
         )
+
+    def _is_internal_transfer(self, text: str) -> bool:
+        """Return True if the text matches one of the entity's own bank account names."""
+        banks = db.fetchall(
+            "SELECT account_name FROM entity_banks WHERE entity_id=?",
+            (self.entity_id,)
+        )
+        for b in banks:
+            name = (b.get("account_name") or "").lower().strip()
+            if name and len(name) > 3 and name in text:
+                return True
+        # Also catch common transfer keywords
+        transfer_kw = ["internal transfer", "own account", "savings transfer",
+                       "bank transfer to", "transfer to ", "transfer from "]
+        return any(kw in text for kw in transfer_kw)
 
     def _refresh(self) -> None:
         """Reload CoA and rule library from DB."""

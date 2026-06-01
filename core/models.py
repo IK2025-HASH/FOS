@@ -215,6 +215,7 @@ STANDARD_COA = [
     ("5720","Pension Contributions",     "Overhead", "Debit",  "No",      None,  0),
     ("5730","Directors Remuneration",    "Overhead", "Debit",  "No",      None,  0),
     ("6000","Corporation Tax Charge",    "Tax",      "Debit",  "No",      None,  0),
+    ("9000","Internal Bank Transfer",    "Asset",    "Debit",  "No",      None,  1),
     ("6010","Deferred Tax",              "Tax",      "Debit",  "No",      None,  0),
 ]
 

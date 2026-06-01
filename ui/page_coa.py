@@ -189,21 +189,54 @@ class CoAPage(BasePage):
             return
 
         from PyQt6.QtWidgets import QDialog, QDialogButtonBox
+        from ui.widgets import FormRow, LineField, ComboField as CF, _DIALOG_SS, WARN
+
         dlg = QDialog(self)
         dlg.setWindowTitle("Add Account")
-        dlg.setMinimumWidth(420)
-        dlg.setStyleSheet(f"background:{WHITE};")
+        dlg.setMinimumWidth(460)
+        dlg.setStyleSheet(f"QDialog {{ background:{WHITE}; }} QLabel {{ color:{TEXT}; }}")
         lay = QVBoxLayout(dlg)
         lay.setSpacing(10)
         lay.setContentsMargins(20, 20, 20, 20)
 
-        from ui.widgets import FormRow, LineField, ComboField as CF
         f_code = LineField("e.g. 5635")
         f_name = LineField("Account name")
         f_type = CF(["Asset","Liability","Equity","Income","CoS","Overhead","Tax"])
         f_nb   = CF(["Debit","Credit"])
         f_vat  = CF(["No","Yes","Exempt"])
         f_vr   = LineField("e.g. 20")
+
+        # AI similarity warning label
+        self._ai_warn = QLabel("")
+        self._ai_warn.setWordWrap(True)
+        self._ai_warn.setStyleSheet(
+            f"color:{WARN}; font-size:11px; background:#FFF8E1; "
+            f"border:1px solid {WARN}; border-radius:4px; padding:6px;"
+        )
+        self._ai_warn.setVisible(False)
+        self._coa_for_check = CoAModel.get_for_entity(entity_id)
+
+        def _check_similarity(text):
+            text = text.lower().strip()
+            if len(text) < 3:
+                self._ai_warn.setVisible(False)
+                return
+            matches = [
+                r for r in self._coa_for_check
+                if any(word in r["name"].lower() for word in text.split()
+                       if len(word) > 3)
+            ]
+            if matches:
+                suggestions = "  |  ".join(f"{r['code']} {r['name']}" for r in matches[:3])
+                self._ai_warn.setText(
+                    f"⚠️  Similar accounts already exist — are you sure you need a new one?\n"
+                    f"   {suggestions}"
+                )
+                self._ai_warn.setVisible(True)
+            else:
+                self._ai_warn.setVisible(False)
+
+        f_name.textChanged.connect(_check_similarity)
 
         for lbl, w in [
             ("Code *",          f_code),
@@ -215,10 +248,13 @@ class CoAPage(BasePage):
         ]:
             lay.addLayout(FormRow(lbl, w))
 
+        lay.addWidget(self._ai_warn)
+
         btns = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Save |
             QDialogButtonBox.StandardButton.Cancel
         )
+        btns.setStyleSheet(_DIALOG_SS)
         btns.accepted.connect(dlg.accept)
         btns.rejected.connect(dlg.reject)
         lay.addWidget(btns)
