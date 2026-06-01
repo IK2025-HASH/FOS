@@ -88,6 +88,12 @@ def main():
             sys.exit(1)
         log.info("Database opened successfully (new_db=%s)", is_new)
 
+    # ── Auto-seed CoA for ALL existing companies on every startup ────────────
+    from core.models import EntityModel, CoAModel
+    for _e in EntityModel.list_all():
+        CoAModel.seed_standard(_e["entity_id"])
+    log.info("CoA auto-seed complete for all companies")
+
     # ── Main window ───────────────────────────────────────────────────────────
     win = MainWindow()
 
