@@ -6,9 +6,11 @@ Checkpoint 1 — Review AI allocations, confirm or override, commit to GL.
 from PyQt6.QtWidgets import (
     QHBoxLayout, QVBoxLayout, QLabel, QComboBox,
     QWidget, QFrame, QScrollArea, QSpacerItem,
-    QSizePolicy, QGroupBox, QLineEdit
+    QSizePolicy, QGroupBox, QLineEdit, QListWidget,
+    QListWidgetItem
 )
 from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QFont
 
 from ui.widgets import (
     BasePage, Card, PrimaryButton, SecondaryButton, StatusBadge,
@@ -166,23 +168,41 @@ class AllocationPage(BasePage):
         lbl_acc = QLabel("Account:")
         lbl_acc.setStyleSheet(f"color:{TEXT}; font-size:13px;")
         lbl_acc.setFixedWidth(80)
-        self.cbo_override_acc = QComboBox()
-        self.cbo_override_acc.setMinimumWidth(360)
-        self.cbo_override_acc.setFixedHeight(34)
-        self.cbo_override_acc.setStyleSheet(
+
+        acc_col = QVBoxLayout()
+        acc_col.setSpacing(2)
+        self.f_acc_search = QLineEdit()
+        self.f_acc_search.setPlaceholderText("Type to search — e.g. fuel, meals, charity…")
+        self.f_acc_search.setFixedHeight(34)
+        self.f_acc_search.setStyleSheet(
             f"border:1px solid {BORDER}; border-radius:4px; padding:0 10px; font-size:13px;"
         )
+        self.f_acc_search.textChanged.connect(self._filter_accounts)
+
+        self.lst_acc = QListWidget()
+        self.lst_acc.setFixedHeight(130)
+        self.lst_acc.setStyleSheet(
+            f"QListWidget {{ border:1px solid {BORDER}; border-radius:4px; "
+            f"font-size:13px; background:white; color:{TEXT}; }}"
+            f"QListWidget::item:selected {{ background:{ACCENT}; color:white; }}"
+        )
+        self.lst_acc.itemClicked.connect(self._acc_selected)
+        acc_col.addWidget(self.f_acc_search)
+        acc_col.addWidget(self.lst_acc)
+
         lbl_vat = QLabel("   VAT:")
         lbl_vat.setStyleSheet(f"color:{TEXT}; font-size:13px;")
         self.cbo_override_vat = ComboField(
             ["SR-I","SR-O","ZR","EX","OS","FRO"], width=100
         )
         row.addWidget(lbl_acc)
-        row.addWidget(self.cbo_override_acc)
+        row.addLayout(acc_col)
         row.addWidget(lbl_vat)
         row.addWidget(self.cbo_override_vat)
         row.addStretch()
         layout.addLayout(row)
+
+        self._override_acc_code = None
 
         reason_row = QHBoxLayout()
         lbl_r = QLabel("Reason:")
@@ -229,9 +249,6 @@ class AllocationPage(BasePage):
         # Load CoA for override dropdown
         coa_rows = CoAModel.get_for_entity(entity_id)
         self._coa_map = {r["code"]: r["name"] for r in coa_rows}
-        self.cbo_override_acc.clear()
-        for r in coa_rows:
-            self.cbo_override_acc.addItem(f"{r['code']}  {r['name']}", r["code"])
 
         # Load staged
         self._staged = ImportModel.get_staged(entity_id)
@@ -314,10 +331,15 @@ class AllocationPage(BasePage):
         self._override_tx_id = tx_id
         dec = self._decisions.get(tx_id, {})
 
-        # Set combo to current allocation
-        for i in range(self.cbo_override_acc.count()):
-            if self.cbo_override_acc.itemData(i) == dec.get("account_code"):
-                self.cbo_override_acc.setCurrentIndex(i)
+        # Populate search list and pre-select current allocation
+        self._override_acc_code = dec.get("account_code")
+        self._filter_accounts("")
+        self.lst_acc.setVisible(True)
+        acc_name = self._coa_map.get(self._override_acc_code, "")
+        self.f_acc_search.setText(f"{self._override_acc_code}  {acc_name}" if acc_name else "")
+        for i in range(self.lst_acc.count()):
+            if self.lst_acc.item(i).data(Qt.ItemDataRole.UserRole) == self._override_acc_code:
+                self.lst_acc.setCurrentRow(i)
                 break
         vat_idx = self.cbo_override_vat.findText(dec.get("vat_code","SR-I"))
         if vat_idx >= 0:
@@ -325,10 +347,32 @@ class AllocationPage(BasePage):
         self.f_reason.clear()
         self.override_card.setVisible(True)
 
+    def _filter_accounts(self, text: str):
+        text = text.lower().strip()
+        self.lst_acc.clear()
+        for code, name in sorted(self._coa_map.items()):
+            if not text or text in code.lower() or text in name.lower():
+                item = QListWidgetItem(f"{code}  {name}")
+                item.setData(Qt.ItemDataRole.UserRole, code)
+                self.lst_acc.addItem(item)
+
+    def _acc_selected(self, item):
+        self._override_acc_code = item.data(Qt.ItemDataRole.UserRole)
+        self.f_acc_search.setText(item.text())
+        self.lst_acc.setVisible(False)
+
     def _save_override(self):
         if not self._override_tx_id:
             return
-        acc_code = self.cbo_override_acc.currentData()
+        acc_code = self._override_acc_code
+        if not acc_code:
+            # fall back to whatever is highlighted in list
+            items = self.lst_acc.selectedItems()
+            if items:
+                acc_code = items[0].data(Qt.ItemDataRole.UserRole)
+        if not acc_code:
+            error(self, "No account selected", "Please select an account from the list.")
+            return
         vat_code = self.cbo_override_vat.currentText()
         reason   = self.f_reason.text().strip()
 
