@@ -575,14 +575,14 @@ class ReportsPage(BasePage):
         self.tbl_income.setRowCount(0)
         for i, row in enumerate(r.get("income_rows", [])):
             set_row(self.tbl_income, i, [
-                row["code"], row["name"], f"£{float(row['total']):,.2f}"
+                row["account_code"], row["name"], f"£{float(row['total']):,.2f}"
             ])
 
         # Expense table
         self.tbl_expenses.setRowCount(0)
         for i, row in enumerate(r.get("expense_rows", [])):
             set_row(self.tbl_expenses, i, [
-                row["code"], row["name"], row["type"], f"£{float(row['total']):,.2f}"
+                row["account_code"], row["name"], row["type"], f"£{float(row['total']):,.2f}"
             ])
 
         # Prefill sign-off from approver record
@@ -793,7 +793,7 @@ def _generate_pdf(path: str, r: dict):
         elems.append(Paragraph("Income Breakdown", h2))
         inc_data = [["Code","Account","Amount £"]]
         for row in r["income_rows"]:
-            inc_data.append([row["code"], row["name"], f"£{float(row['total']):,.2f}"])
+            inc_data.append([row["account_code"], row["name"], f"£{float(row['total']):,.2f}"])
         _append_breakdown(elems, inc_data, dark, light)
 
     # Expense breakdown
@@ -801,7 +801,7 @@ def _generate_pdf(path: str, r: dict):
         elems.append(Paragraph("Expense Breakdown", h2))
         exp_data = [["Code","Account","Type","Amount £"]]
         for row in r["expense_rows"]:
-            exp_data.append([row["code"], row["name"], row["type"],
+            exp_data.append([row["account_code"], row["name"], row["type"],
                              f"£{float(row['total']):,.2f}"])
         _append_breakdown(elems, exp_data, dark, light)
 

@@ -116,9 +116,11 @@ def _export_table(parent, rows: list, headers: list, fmt: str, default_name: str
             _export_excel(path, rows, headers, default_name)
         elif fmt == "PDF":
             _export_pdf(path, rows, headers, default_name)
-        QMessageBox.information(parent, "Exported", f"Saved to:\n{path}")
+        from ui.widgets import info, error
+        info(parent, "Exported", f"Saved to:\n{path}")
     except Exception as exc:
-        QMessageBox.critical(parent, "Export Failed", str(exc))
+        from ui.widgets import error
+        error(parent, "Export Failed", str(exc))
 
 
 def _export_csv(path: str, rows: list, headers: list):
