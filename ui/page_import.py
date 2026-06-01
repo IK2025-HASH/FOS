@@ -7,7 +7,7 @@ import os
 from datetime import date
 from PyQt6.QtWidgets import (
     QHBoxLayout, QVBoxLayout, QLabel, QFileDialog,
-    QProgressBar, QWidget, QPushButton
+    QProgressBar, QWidget, QPushButton, QListWidget, QListWidgetItem
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 
@@ -28,11 +28,10 @@ class ImportWorker(QThread):
     finished  = pyqtSignal(int, int, list)
     failed    = pyqtSignal(str)
 
-    def __init__(self, entity_id, filepaths, bank_name):
+    def __init__(self, entity_id, file_queue):
         super().__init__()
         self.entity_id  = entity_id
-        self.filepaths  = filepaths   # list of file paths
-        self.bank_name  = bank_name
+        self.file_queue = file_queue   # list of (bank_name, filepath)
 
     def run(self):
         try:
@@ -40,7 +39,7 @@ class ImportWorker(QThread):
             total_allocs = 0
             all_warnings = []
 
-            for fp in self.filepaths:
+            for bank_name, fp in self.file_queue:
                 fname = os.path.basename(fp)
                 self.progress.emit(f"Parsing {fname}…")
                 rows, fmt, warnings = parse_file(fp)
@@ -48,10 +47,9 @@ class ImportWorker(QThread):
                     all_warnings.append(f"{fname}: no transactions found")
                     continue
 
-                # Tag bank name into description prefix if provided
-                if self.bank_name:
+                if bank_name:
                     for r in rows:
-                        r["description"] = f"[{self.bank_name}] {r.get('description','')}"
+                        r["description"] = f"[{bank_name}] {r.get('description','')}"
 
                 self.progress.emit(f"{fname}: {len(rows)} rows found. Staging…")
                 batch_id = ImportModel.create_batch(
@@ -85,7 +83,7 @@ class ImportPage(BasePage):
                          "Load CSV, Excel, or PDF bank statements")
         self._entity_map: dict = {}
         self._worker = None
-        self._selected_files = []
+        self._file_queue: list = []   # list of (bank_name, filepath)
         self._build()
 
     def _build(self):
@@ -105,40 +103,48 @@ class ImportPage(BasePage):
         row1.addStretch()
         sel_body.addLayout(row1)
 
-        # Bank account — editable so any name can be typed freely
-        row_bank = QHBoxLayout()
-        lbl_bank = QLabel("Bank Account:")
+        # Bank + Add Files row
+        add_row = QHBoxLayout()
+        lbl_bank = QLabel("Bank:")
         lbl_bank.setStyleSheet(f"color:{TEXT}; font-size:13px;")
+        lbl_bank.setFixedWidth(44)
         self.cbo_bank = ComboField(["— select company first —"])
         self.cbo_bank.setEditable(True)
-        self.cbo_bank.setMinimumWidth(280)
-        self.cbo_bank.setPlaceholderText("Type or select bank name (e.g. Wise, Revolut…)")
-        tip = QLabel("Type any bank name — registered banks shown as suggestions")
+        self.cbo_bank.setMinimumWidth(240)
+        self.cbo_bank.setPlaceholderText("Type or select bank (e.g. Starling, Wise…)")
+        self.btn_add = SecondaryButton("+ Add Files for This Bank")
+        self.btn_add.clicked.connect(self._add_files)
+        add_row.addWidget(lbl_bank)
+        add_row.addWidget(self.cbo_bank)
+        add_row.addWidget(self.btn_add)
+        add_row.addStretch()
+        sel_body.addLayout(add_row)
+
+        tip = QLabel("Select the bank, click '+ Add Files', pick files — repeat for each bank.  Supports CSV, Excel, PDF.")
         tip.setStyleSheet(f"color:{MUTED}; font-size:11px; font-style:italic;")
-        row_bank.addWidget(lbl_bank)
-        row_bank.addWidget(self.cbo_bank)
-        row_bank.addStretch()
-        sel_body.addLayout(row_bank)
+        tip.setWordWrap(True)
         sel_body.addWidget(tip)
 
-        # File picker
-        row2 = QHBoxLayout()
-        self.lbl_files = QLabel("No files selected")
-        self.lbl_files.setStyleSheet(f"color:{MUTED}; font-size:13px;")
-        self.btn_browse = SecondaryButton("Browse…")
-        self.btn_browse.clicked.connect(self._browse)
-        row2.addWidget(self.lbl_files)
-        row2.addStretch()
-        row2.addWidget(self.btn_browse)
-        sel_body.addLayout(row2)
+        # Queue list
+        queue_hdr = QHBoxLayout()
+        lbl_q = QLabel("Files queued for import:")
+        lbl_q.setStyleSheet(f"color:{TEXT}; font-size:13px; font-weight:bold;")
+        self.btn_clear_queue = SecondaryButton("✕  Clear All")
+        self.btn_clear_queue.clicked.connect(self._clear_queue)
+        queue_hdr.addWidget(lbl_q)
+        queue_hdr.addStretch()
+        queue_hdr.addWidget(self.btn_clear_queue)
+        sel_body.addLayout(queue_hdr)
 
-        note = QLabel(
-            "Supported formats: CSV (Barclays, HSBC, Lloyds, NatWest, Starling, Monzo, generic)  "
-            "|  Excel .xlsx/.xls  |  PDF (table-based bank exports)  —  You can select multiple files at once."
+        self.lst_queue = QListWidget()
+        self.lst_queue.setFixedHeight(120)
+        from ui.widgets import BORDER, ACCENT, TEXT as _T
+        self.lst_queue.setStyleSheet(
+            f"QListWidget {{ border:1px solid {BORDER}; border-radius:4px; "
+            f"font-size:12px; background:white; color:{TEXT}; }}"
+            f"QListWidget::item:selected {{ background:{ACCENT}; color:white; }}"
         )
-        note.setStyleSheet(f"color:{MUTED}; font-size:11px; font-style:italic;")
-        note.setWordWrap(True)
-        sel_body.addWidget(note)
+        sel_body.addWidget(self.lst_queue)
 
         self.btn_import = PrimaryButton("Import and Run AI Allocation")
         self.btn_import.setEnabled(False)
@@ -268,37 +274,42 @@ class ImportPage(BasePage):
         self.cbo_bank.blockSignals(False)
         self._check_ready()
 
-    def _browse(self):
+    def _add_files(self):
+        bank_name = self.cbo_bank.currentText().strip()
+        if not bank_name or bank_name.startswith("—"):
+            error(self, "No Bank Selected", "Please select or type a bank name first.")
+            return
         fps, _ = QFileDialog.getOpenFileNames(
-            self, "Select Bank Statements",
+            self, f"Select Files for {bank_name}",
             "", "Bank Statements (*.csv *.xlsx *.xls *.pdf);;All Files (*)"
         )
         if fps:
-            self._selected_files = fps
-            if len(fps) == 1:
-                self.lbl_files.setText(os.path.basename(fps[0]))
-            else:
-                self.lbl_files.setText(f"{len(fps)} files selected")
-            self.lbl_files.setStyleSheet(f"color:{TEXT}; font-size:13px;")
+            for fp in fps:
+                self._file_queue.append((bank_name, fp))
+                item = QListWidgetItem(f"  {bank_name}  →  {os.path.basename(fp)}")
+                self.lst_queue.addItem(item)
             self._check_ready()
+
+    def _clear_queue(self):
+        self._file_queue.clear()
+        self.lst_queue.clear()
+        self._check_ready()
 
     def _check_ready(self):
         entity = self._entity_map.get(self.cbo_entity.currentText())
-        self.btn_import.setEnabled(bool(entity and self._selected_files))
+        self.btn_import.setEnabled(bool(entity and self._file_queue))
 
     def _run_import(self):
         entity_id = self._entity_map.get(self.cbo_entity.currentText())
-        if not entity_id or not self._selected_files:
+        if not entity_id or not self._file_queue:
             return
-
-        bank_name = self.cbo_bank.currentText().strip()
 
         self.btn_import.setEnabled(False)
         self.progress_bar.setVisible(True)
         self.lbl_progress.setStyleSheet(f"color:{TEXT}; font-size:13px;")
         self.lbl_progress.setText("Starting import…")
 
-        self._worker = ImportWorker(entity_id, self._selected_files, bank_name)
+        self._worker = ImportWorker(entity_id, list(self._file_queue))
         self._worker.progress.connect(self._on_progress)
         self._worker.finished.connect(self._on_done)
         self._worker.failed.connect(self._on_error)
@@ -309,10 +320,7 @@ class ImportPage(BasePage):
 
     def _on_done(self, tx_count: int, alloc_count: int, warnings: list):
         self.progress_bar.setVisible(False)
-        self.btn_import.setEnabled(True)
-        self._selected_files = []
-        self.lbl_files.setText("No files selected")
-        self.lbl_files.setStyleSheet(f"color:{MUTED}; font-size:13px;")
+        self._clear_queue()
         msg = f"✓  Import complete — {tx_count} transactions staged, {alloc_count} AI allocations made."
         if warnings:
             msg += f"  ({len(warnings)} warnings)"
