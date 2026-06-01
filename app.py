@@ -26,6 +26,7 @@ from ui.page_coa import CoAPage
 from ui.page_import import ImportPage
 from ui.page_allocation import AllocationPage
 from ui.page_gl import GLPage, TrialBalancePage
+from ui.page_reports import ReportsPage
 
 import os
 _LOG_DIR = Path(os.environ.get("APPDATA", Path.home() / ".local" / "share")) / "FOS"
@@ -98,6 +99,7 @@ def main():
     alloc_pg    = AllocationPage()
     gl_pg       = GLPage()
     tb_pg       = TrialBalancePage()
+    reports_pg  = ReportsPage()
 
     # Register pages
     win.add_page("dashboard",  dashboard)
@@ -107,11 +109,12 @@ def main():
     win.add_page("allocation", alloc_pg)
     win.add_page("gl",         gl_pg)
     win.add_page("tb",         tb_pg)
+    win.add_page("reports",    reports_pg)
 
     import core.context as ctx
 
     # ── Pages that respond to global company change ───────────────────────────
-    pages_with_entity = [coa_pg, import_pg, alloc_pg, gl_pg, tb_pg]
+    pages_with_entity = [coa_pg, import_pg, alloc_pg, gl_pg, tb_pg, reports_pg]
 
     def _sync_all(entity_id: str):
         for pg in pages_with_entity:
@@ -147,6 +150,7 @@ def main():
     for pg in pages_with_entity:
         pg.refresh_entities()
     dashboard.refresh()
+    reports_pg.refresh_entities()
     win.refresh_companies()   # sets context → triggers _sync_all
 
     # ── Launch ────────────────────────────────────────────────────────────────
