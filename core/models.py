@@ -210,6 +210,10 @@ STANDARD_COA = [
     ("5610","Depreciation",              "Overhead", "Debit",  "No",      None,  0),
     ("5620","Sundry Expenses",           "Overhead", "Debit",  "Yes",     20.0,  0),
     ("5630","Bad Debt Write-Off",        "Overhead", "Debit",  "No",      None,  0),
+    ("5700","Salaries and Wages",        "Overhead", "Debit",  "No",      None,  0),
+    ("5710","Employer NIC",              "Overhead", "Debit",  "No",      None,  0),
+    ("5720","Pension Contributions",     "Overhead", "Debit",  "No",      None,  0),
+    ("5730","Directors Remuneration",    "Overhead", "Debit",  "No",      None,  0),
     ("6000","Corporation Tax Charge",    "Tax",      "Debit",  "No",      None,  0),
     ("6010","Deferred Tax",              "Tax",      "Debit",  "No",      None,  0),
 ]
@@ -368,16 +372,31 @@ class ImportModel:
             amount = float(tx["amount"])
             vat_rate = _vat_rate_for_code(d["vat_code"])
             vat_amount = round(abs(amount) * vat_rate / (1 + vat_rate), 2) if vat_rate > 0 else 0.0
-            net = amount
+            abs_amt = abs(amount)
+            period  = _period(tx["date"])
 
-            is_credit = amount > 0
+            # Money out (negative amount): debit expense, credit bank
+            # Money in  (positive amount): debit bank, credit income
+            if amount < 0:
+                exp_debit, exp_credit  = abs_amt, 0.0
+                bank_debit, bank_credit = 0.0, abs_amt
+            else:
+                exp_debit, exp_credit  = 0.0, abs_amt
+                bank_debit, bank_credit = abs_amt, 0.0
+
+            # Expense / income line
             gl_rows.append((_uid(), entity_id, d["account_code"], tx["date"],
                              tx["description"],
-                             0.0 if is_credit else abs(net),
-                             abs(net) if is_credit else 0.0,
+                             exp_debit, exp_credit,
                              d["vat_code"], vat_amount,
-                             tx["source"], tx["batch_id"], approval_id,
-                             _period(tx["date"]), 0))
+                             tx["source"], tx["batch_id"], approval_id, period, 0))
+
+            # Bank counterpart line (always OS / no VAT on bank movement)
+            gl_rows.append((_uid(), entity_id, "1000", tx["date"],
+                             tx["description"],
+                             bank_debit, bank_credit,
+                             "OS", 0.0,
+                             tx["source"], tx["batch_id"], approval_id, period, 0))
 
             # Update allocation override if user changed it
             if d.get("override"):

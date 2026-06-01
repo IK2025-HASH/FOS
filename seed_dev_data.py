@@ -70,9 +70,15 @@ COMPANIES = [
 
 existing = {e["legal_name"] for e in EntityModel.list_all()}
 
+from core.models import CoAModel
+all_entities = EntityModel.list_all()
+
 for co in COMPANIES:
     if co["legal_name"] in existing:
-        print(f"  SKIP  {co['legal_name']} (already exists)")
+        print(f"  SKIP  {co['legal_name']} (already exists — re-seeding CoA for new accounts)")
+        e = next((x for x in all_entities if x["legal_name"] == co["legal_name"]), None)
+        if e:
+            CoAModel.seed_standard(e["entity_id"])
     else:
         entity_id = EntityModel.create(**co)
         print(f"  OK    {co['legal_name']} created ({entity_id[:8]}...)")
