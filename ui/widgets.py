@@ -226,6 +226,14 @@ def set_row(table: QTableWidget, row: int, values: list,
 
 # ── Simple confirm dialog ─────────────────────────────────────────────────────
 
+_DIALOG_SS = (
+    f"QMessageBox {{ background:white; color:{TEXT}; }}"
+    f"QLabel {{ color:{TEXT}; background:transparent; }}"
+    f"QPushButton {{ background:{ACCENT}; color:white; border:none; border-radius:4px; "
+    f"padding:6px 20px; font-size:13px; font-weight:bold; min-width:72px; }}"
+    f"QPushButton:hover {{ background:#1C5A8A; }}"
+)
+
 def confirm(parent, title: str, message: str) -> bool:
     dlg = QMessageBox(parent)
     dlg.setWindowTitle(title)
@@ -234,12 +242,23 @@ def confirm(parent, title: str, message: str) -> bool:
         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
     )
     dlg.setDefaultButton(QMessageBox.StandardButton.No)
+    dlg.setStyleSheet(_DIALOG_SS)
     return dlg.exec() == QMessageBox.StandardButton.Yes
 
 
 def info(parent, title: str, message: str) -> None:
-    QMessageBox.information(parent, title, message)
+    dlg = QMessageBox(parent)
+    dlg.setWindowTitle(title)
+    dlg.setText(message)
+    dlg.setIcon(QMessageBox.Icon.Information)
+    dlg.setStyleSheet(_DIALOG_SS)
+    dlg.exec()
 
 
 def error(parent, title: str, message: str) -> None:
-    QMessageBox.critical(parent, title, message)
+    dlg = QMessageBox(parent)
+    dlg.setWindowTitle(title)
+    dlg.setText(message)
+    dlg.setIcon(QMessageBox.Icon.Critical)
+    dlg.setStyleSheet(_DIALOG_SS)
+    dlg.exec()

@@ -461,3 +461,20 @@ class GLModel:
                 ORDER BY c.code""",
             params
         )
+
+
+class DataUtils:
+    @staticmethod
+    def clear_transactions(entity_id: str) -> int:
+        """Delete all staged/posted transaction data for an entity, keeping companies and CoA intact."""
+        n = db.fetchone("SELECT COUNT(*) as n FROM transactions WHERE entity_id=?", (entity_id,))["n"]
+        db.execute("DELETE FROM gl WHERE entity_id=?", (entity_id,))
+        db.execute("DELETE FROM approvals WHERE entity_id=?", (entity_id,))
+        db.execute(
+            "DELETE FROM ai_allocations WHERE tx_id IN "
+            "(SELECT tx_id FROM transactions WHERE entity_id=?)", (entity_id,)
+        )
+        db.execute("DELETE FROM transactions WHERE entity_id=?", (entity_id,))
+        db.execute("DELETE FROM import_batches WHERE entity_id=?", (entity_id,))
+        db.commit()
+        return n

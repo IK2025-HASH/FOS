@@ -7,11 +7,11 @@ from PyQt6.QtWidgets import QHBoxLayout, QVBoxLayout, QLabel, QGridLayout, QWidg
 from PyQt6.QtCore import Qt
 
 from ui.widgets import (
-    BasePage, Card, PrimaryButton, SecondaryButton,
-    make_table, set_row,
+    BasePage, Card, PrimaryButton, SecondaryButton, ComboField,
+    make_table, set_row, confirm, info,
     ACCENT, DARK, TEXT, MUTED, WHITE, BG, SUCCESS, WARN, DANGER, BORDER
 )
-from core.models import EntityModel, GLModel
+from core.models import EntityModel, GLModel, DataUtils
 from core.database import db
 
 
@@ -35,6 +35,15 @@ class DashboardPage(BasePage):
                 btn.clicked.connect(lambda _, t=target: self._navigate(t))
             btn_row.addWidget(btn)
         btn_row.addStretch()
+
+        btn_clear = SecondaryButton("🗑  Clear Test Data")
+        btn_clear.setStyleSheet(
+            btn_clear.styleSheet().replace(f"color:{ACCENT}", f"color:{DANGER}")
+                                  .replace(f"border:2px solid {ACCENT}", f"border:2px solid {DANGER}")
+        )
+        btn_clear.clicked.connect(self._clear_test_data)
+        btn_row.addWidget(btn_clear)
+
         self.layout_.addLayout(btn_row)
 
         # Entity summary grid
@@ -126,6 +135,42 @@ class DashboardPage(BasePage):
                 f"{float(r['debit']):,.2f}"  if float(r['debit'])  else "",
                 f"{float(r['credit']):,.2f}" if float(r['credit']) else "",
             ])
+
+    def _clear_test_data(self):
+        entities = EntityModel.list_all()
+        if not entities:
+            return
+        names = [e["legal_name"] for e in entities]
+        from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QDialogButtonBox
+        from ui.widgets import ComboField, _DIALOG_SS, DANGER, TEXT
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Clear Test Data")
+        dlg.setStyleSheet("QDialog { background:white; } QLabel { color:" + TEXT + "; }")
+        lay = QVBoxLayout(dlg)
+        lay.setSpacing(12)
+        lay.setContentsMargins(20,20,20,20)
+        lbl = QLabel("Select company to clear ALL transactions, GL and approvals from:\n(Companies and Chart of Accounts are kept.)")
+        lbl.setWordWrap(True)
+        lay.addWidget(lbl)
+        cbo = ComboField(names)
+        lay.addWidget(cbo)
+        btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        btns.setStyleSheet("QPushButton { background:" + DANGER + "; color:white; border:none; border-radius:4px; padding:6px 20px; font-weight:bold; }")
+        btns.accepted.connect(dlg.accept)
+        btns.rejected.connect(dlg.reject)
+        lay.addWidget(btns)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        chosen = cbo.currentText()
+        entity = next((e for e in entities if e["legal_name"] == chosen), None)
+        if not entity:
+            return
+        if not confirm(self, "Confirm Clear",
+                       f"Delete ALL transactions and GL entries for:\n{chosen}\n\nThis cannot be undone."):
+            return
+        n = DataUtils.clear_transactions(entity["entity_id"])
+        info(self, "Cleared", f"✓  {n} transactions and all GL/approval records deleted for {chosen}.")
+        self.refresh()
 
     def _entity_card(self, e: dict) -> QWidget:
         frame = Card(e["legal_name"])
