@@ -5,10 +5,9 @@ Main application shell — navigation sidebar + stacked content area.
 
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
-    QPushButton, QStackedWidget, QLabel, QFrame, QSizePolicy, QComboBox
+    QPushButton, QStackedWidget, QLabel, QFrame, QComboBox
 )
-from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtGui import QFont, QColor, QPalette
+from PyQt6.QtCore import Qt
 
 NAV_W  = 200
 ACCENT = "#2E6DA4"

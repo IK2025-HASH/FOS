@@ -7,10 +7,8 @@ Account and VAT editable directly in the table row — no separate panel.
 from PyQt6.QtWidgets import (
     QHBoxLayout, QVBoxLayout, QLabel, QComboBox,
     QWidget, QFrame, QLineEdit, QListWidget, QListWidgetItem,
-    QAbstractItemView, QSizePolicy
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer
-from PyQt6.QtGui import QColor
+from PyQt6.QtCore import Qt, pyqtSignal
 
 from ui.widgets import (
     BasePage, Card, PrimaryButton, SecondaryButton,
@@ -98,10 +96,13 @@ class _AccountPopup(QFrame):
             self._pick()
 
     def show_near(self, gpos):
+        self.search.blockSignals(True)
         self.search.clear()
-        self._fill("")
+        self.search.blockSignals(False)
+        self._fill("")          # uses self._coa_map which is already updated by caller
         self.move(gpos)
         self.show()
+        self.raise_()
         self.search.setFocus()
 
 
@@ -122,10 +123,12 @@ class AllocationPage(BasePage):
     # ── Build ─────────────────────────────────────────────────────────────────
 
     def _build(self):
-        top = QHBoxLayout()
+        # Hidden entity combo — driven by global sidebar context
         self.cbo_entity = ComboField(["— select company —"])
         self.cbo_entity.setVisible(False)
         self.cbo_entity.currentIndexChanged.connect(self._load)
+
+        top = QHBoxLayout()
         self.btn_refresh = SecondaryButton("⟳  Refresh")
         self.btn_refresh.clicked.connect(self._load)
         top.addStretch()
@@ -239,8 +242,8 @@ class AllocationPage(BasePage):
             if self._popup is None:
                 self._popup = _AccountPopup(self._coa_map, self)
                 self._popup.selected.connect(self._on_account_selected)
-            else:
-                self._popup._coa_map = self._coa_map
+            # Always refresh the map — a new dict may have been assigned since creation
+            self._popup._coa_map = self._coa_map
             rect = self.tbl.visualItemRect(self.tbl.item(row, col))
             gpos = self.tbl.viewport().mapToGlobal(rect.bottomLeft())
             self._popup.show_near(gpos)

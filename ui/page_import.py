@@ -91,18 +91,10 @@ class ImportPage(BasePage):
         sel_card = Card("Select Company and Files")
         sel_body = sel_card.body()
 
-        # Company selector
-        row1 = QHBoxLayout()
-        lbl_e = QLabel("Company:")
-        lbl_e.setVisible(False)
+        # Hidden entity combo — driven by global sidebar context
         self.cbo_entity = ComboField(["— select company —"])
-        self.cbo_entity.setMinimumWidth(280)
         self.cbo_entity.setVisible(False)
         self.cbo_entity.currentIndexChanged.connect(self._on_entity_changed)
-        row1.addWidget(lbl_e)
-        row1.addWidget(self.cbo_entity)
-        row1.addStretch()
-        sel_body.addLayout(row1)
 
         # Bank + Add Files row
         add_row = QHBoxLayout()
