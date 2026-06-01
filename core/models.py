@@ -204,8 +204,11 @@ STANDARD_COA = [
     ("5550","Marketing and Advertising", "Overhead", "Debit",  "Yes",     20.0,  0),
     ("5560","Travel and Accommodation",  "Overhead", "Debit",  "Yes",     20.0,  0),
     ("5570","Meals and Entertainment",   "Overhead", "Debit",  "Yes",     20.0,  0),
+    ("5575","Client Entertainment",      "Overhead", "Debit",  "Yes",     20.0,  0),
     ("5580","Motor Expenses",            "Overhead", "Debit",  "Yes",     20.0,  0),
+    ("5585","General Maintenance",       "Overhead", "Debit",  "Yes",     20.0,  0),
     ("5590","Professional Fees",         "Overhead", "Debit",  "Yes",     20.0,  0),
+    ("5595","Charitable Donations",      "Overhead", "Debit",  "No",      None,  0),
     ("5600","Bank Charges and Interest", "Overhead", "Debit",  "Exempt",  None,  0),
     ("5610","Depreciation",              "Overhead", "Debit",  "No",      None,  0),
     ("5620","Sundry Expenses",           "Overhead", "Debit",  "Yes",     20.0,  0),
@@ -215,8 +218,8 @@ STANDARD_COA = [
     ("5720","Pension Contributions",     "Overhead", "Debit",  "No",      None,  0),
     ("5730","Directors Remuneration",    "Overhead", "Debit",  "No",      None,  0),
     ("6000","Corporation Tax Charge",    "Tax",      "Debit",  "No",      None,  0),
-    ("9000","Internal Bank Transfer",    "Asset",    "Debit",  "No",      None,  1),
     ("6010","Deferred Tax",              "Tax",      "Debit",  "No",      None,  0),
+    ("9000","Internal Bank Transfer",    "Asset",    "Debit",  "No",      None,  1),
 ]
 
 
