@@ -4,12 +4,14 @@ code,name,type,normal_balance,vat_applicable,vat_rate,system_locked
 1020,Petty Cash,Asset,Debit,No,,0
 1100,Trade Debtors,Asset,Debit,No,,1
 1110,Prepayments,Asset,Debit,No,,0
+1120,Other Debtors / Accrued Income,Asset,Debit,No,,0
 1130,Stock / Inventory,Asset,Debit,No,,0
 1200,VAT Reclaim Receivable,Asset,Debit,No,,1
 1300,Fixed Assets — Equipment,Asset,Debit,No,,0
 1310,Fixed Assets — Vehicles,Asset,Debit,No,,0
 1320,Fixed Assets — Fixtures & Fittings,Asset,Debit,No,,0
 1330,Fixed Assets — Leasehold Improvements,Asset,Debit,No,,0
+1340,Intangible Assets,Asset,Debit,No,,0
 1390,Accumulated Depreciation,Asset,Credit,No,,0
 2000,Trade Creditors,Liability,Credit,No,,1
 2100,VAT Liability,Liability,Credit,No,,1
@@ -19,7 +21,9 @@ code,name,type,normal_balance,vat_applicable,vat_rate,system_locked
 2300,Corporation Tax Provision,Liability,Credit,No,,0
 2400,Director Loan Account,Liability,Credit,No,,0
 2500,Bank Loan,Liability,Credit,No,,0
+2510,HP / Finance Lease Liability,Liability,Credit,No,,0
 2600,Accruals,Liability,Credit,No,,0
+2610,Deferred Income,Liability,Credit,No,,0
 3000,Share Capital,Equity,Credit,No,,1
 3100,Retained Earnings,Equity,Credit,No,,1
 3200,Owner Drawings,Equity,Debit,No,,0
@@ -57,6 +61,7 @@ code,name,type,normal_balance,vat_applicable,vat_rate,system_locked
 5595,Charitable Donations,Overhead,Debit,No,,0
 5600,Bank Charges and Interest,Overhead,Debit,Exempt,,0
 5610,Depreciation,Overhead,Debit,No,,0
+5615,Amortisation,Overhead,Debit,No,,0
 5620,Sundry Expenses,Overhead,Debit,Yes,20.0,0
 5630,Bad Debt Write-Off,Overhead,Debit,No,,0
 5700,Salaries and Wages,Overhead,Debit,No,,0
