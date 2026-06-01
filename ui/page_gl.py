@@ -199,12 +199,13 @@ class GLPage(BasePage):
     def _build(self):
         bar = QHBoxLayout()
         lbl = QLabel("Company:")
-        lbl.setStyleSheet(f"color:{TEXT}; font-size:13px;")
+        lbl.setVisible(False)
         self.cbo_entity = ComboField(["— select company —"])
         self.cbo_entity.setMinimumWidth(260)
+        self.cbo_entity.setVisible(False)
         self.cbo_entity.currentIndexChanged.connect(self._on_entity_change)
 
-        lbl_fy = QLabel("  FY:")
+        lbl_fy = QLabel("FY:")
         lbl_fy.setStyleSheet(f"color:{TEXT}; font-size:13px;")
         self.cbo_fy = ComboField(["All Years"])
         self.cbo_fy.setMinimumWidth(180)
@@ -271,8 +272,18 @@ class GLPage(BasePage):
         self.cbo_entity.blockSignals(False)
         self._on_entity_change()
 
+    def set_active_entity(self, entity_id: str) -> None:
+        for name, eid in self._entity_map.items():
+            if eid == entity_id:
+                self.cbo_entity.blockSignals(True)
+                self.cbo_entity.setCurrentText(name)
+                self.cbo_entity.blockSignals(False)
+                break
+        self._on_entity_change()
+
     def _on_entity_change(self):
-        entity_id = self._entity_map.get(self.cbo_entity.currentText(), "")
+        import core.context as ctx
+        entity_id = ctx.get_entity_id() or self._entity_map.get(self.cbo_entity.currentText(), "")
         self._refresh_fy(entity_id)
         self._load()
 
@@ -290,7 +301,8 @@ class GLPage(BasePage):
         self.cbo_fy.blockSignals(False)
 
     def _load(self):
-        entity_id = self._entity_map.get(self.cbo_entity.currentText(),"")
+        import core.context as ctx
+        entity_id = ctx.get_entity_id() or self._entity_map.get(self.cbo_entity.currentText(),"")
         if not entity_id:
             return
 
@@ -373,12 +385,13 @@ class TrialBalancePage(BasePage):
     def _build(self):
         bar = QHBoxLayout()
         lbl = QLabel("Company:")
-        lbl.setStyleSheet(f"color:{TEXT}; font-size:13px;")
+        lbl.setVisible(False)
         self.cbo_entity = ComboField(["— select company —"])
         self.cbo_entity.setMinimumWidth(260)
+        self.cbo_entity.setVisible(False)
         self.cbo_entity.currentIndexChanged.connect(self._on_entity_change)
 
-        lbl_fy = QLabel("  FY:")
+        lbl_fy = QLabel("FY:")
         lbl_fy.setStyleSheet(f"color:{TEXT}; font-size:13px;")
         self.cbo_fy = ComboField(["All Years"])
         self.cbo_fy.setMinimumWidth(180)
@@ -435,8 +448,18 @@ class TrialBalancePage(BasePage):
         self.cbo_entity.blockSignals(False)
         self._on_entity_change()
 
+    def set_active_entity(self, entity_id: str) -> None:
+        for name, eid in self._entity_map.items():
+            if eid == entity_id:
+                self.cbo_entity.blockSignals(True)
+                self.cbo_entity.setCurrentText(name)
+                self.cbo_entity.blockSignals(False)
+                break
+        self._on_entity_change()
+
     def _on_entity_change(self):
-        entity_id = self._entity_map.get(self.cbo_entity.currentText(), "")
+        import core.context as ctx
+        entity_id = ctx.get_entity_id() or self._entity_map.get(self.cbo_entity.currentText(), "")
         self._fy_map = {}
         self.cbo_fy.blockSignals(True)
         self.cbo_fy.clear()
@@ -451,7 +474,8 @@ class TrialBalancePage(BasePage):
         self._load()
 
     def _load(self):
-        entity_id = self._entity_map.get(self.cbo_entity.currentText(),"")
+        import core.context as ctx
+        entity_id = ctx.get_entity_id() or self._entity_map.get(self.cbo_entity.currentText(),"")
         if not entity_id:
             return
 

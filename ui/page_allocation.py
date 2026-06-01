@@ -51,9 +51,10 @@ class AllocationPage(BasePage):
         # Entity selector + stats bar
         top = QHBoxLayout()
         lbl = QLabel("Company:")
-        lbl.setStyleSheet(f"color:{TEXT}; font-size:13px;")
+        lbl.setVisible(False)
         self.cbo_entity = ComboField(["— select company —"])
         self.cbo_entity.setMinimumWidth(280)
+        self.cbo_entity.setVisible(False)
         self.cbo_entity.currentIndexChanged.connect(self._load)
 
         self.btn_refresh = SecondaryButton("⟳  Refresh")
@@ -436,4 +437,17 @@ class AllocationPage(BasePage):
     # ── Helpers ───────────────────────────────────────────────────────────────
 
     def _current_entity_id(self) -> str:
+        import core.context as ctx
+        eid = ctx.get_entity_id()
+        if eid:
+            return eid
         return self._entity_map.get(self.cbo_entity.currentText(), "")
+
+    def set_active_entity(self, entity_id: str) -> None:
+        for name, eid in self._entity_map.items():
+            if eid == entity_id:
+                self.cbo_entity.blockSignals(True)
+                self.cbo_entity.setCurrentText(name)
+                self.cbo_entity.blockSignals(False)
+                break
+        self._load()

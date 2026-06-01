@@ -94,9 +94,10 @@ class ImportPage(BasePage):
         # Company selector
         row1 = QHBoxLayout()
         lbl_e = QLabel("Company:")
-        lbl_e.setStyleSheet(f"color:{TEXT}; font-size:13px;")
+        lbl_e.setVisible(False)
         self.cbo_entity = ComboField(["— select company —"])
         self.cbo_entity.setMinimumWidth(280)
+        self.cbo_entity.setVisible(False)
         self.cbo_entity.currentIndexChanged.connect(self._on_entity_changed)
         row1.addWidget(lbl_e)
         row1.addWidget(self.cbo_entity)
@@ -259,7 +260,7 @@ class ImportPage(BasePage):
             cbo.blockSignals(False)
 
     def _on_entity_changed(self):
-        entity_id = self._entity_map.get(self.cbo_entity.currentText())
+        entity_id = self._current_entity_id()
         self.cbo_bank.blockSignals(True)
         self.cbo_bank.clear()
         if entity_id:
@@ -295,12 +296,27 @@ class ImportPage(BasePage):
         self.lst_queue.clear()
         self._check_ready()
 
+    def _current_entity_id(self) -> str:
+        import core.context as ctx
+        eid = ctx.get_entity_id()
+        if eid:
+            return eid
+        return self._entity_map.get(self.cbo_entity.currentText(), "")
+
+    def set_active_entity(self, entity_id: str) -> None:
+        for name, eid in self._entity_map.items():
+            if eid == entity_id:
+                self.cbo_entity.blockSignals(True)
+                self.cbo_entity.setCurrentText(name)
+                self.cbo_entity.blockSignals(False)
+                break
+        self._on_entity_changed()
+
     def _check_ready(self):
-        entity = self._entity_map.get(self.cbo_entity.currentText())
-        self.btn_import.setEnabled(bool(entity and self._file_queue))
+        self.btn_import.setEnabled(bool(self._current_entity_id() and self._file_queue))
 
     def _run_import(self):
-        entity_id = self._entity_map.get(self.cbo_entity.currentText())
+        entity_id = self._current_entity_id()
         if not entity_id or not self._file_queue:
             return
 

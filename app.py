@@ -108,26 +108,33 @@ def main():
     win.add_page("gl",         gl_pg)
     win.add_page("tb",         tb_pg)
 
+    import core.context as ctx
+
+    # ── Pages that respond to global company change ───────────────────────────
+    pages_with_entity = [coa_pg, import_pg, alloc_pg, gl_pg, tb_pg]
+
+    def _sync_all(entity_id: str):
+        for pg in pages_with_entity:
+            pg.set_active_entity(entity_id)
+        dashboard.refresh()
+
+    ctx.register(_sync_all)
+
     # ── Cross-page wiring ─────────────────────────────────────────────────────
 
     def on_entity_created(entity_id: str):
-        """When a new company is saved, refresh entity dropdowns everywhere."""
-        coa_pg.refresh_entities()
-        import_pg.refresh_entities()
-        alloc_pg.refresh_entities()
-        gl_pg.refresh_entities()
-        tb_pg.refresh_entities()
+        for pg in pages_with_entity:
+            pg.refresh_entities()
+        win.refresh_companies()
         dashboard.refresh()
         win.navigate("coa")
 
     def on_import_done():
-        """After a successful import, jump to allocation review."""
         alloc_pg.refresh_entities()
         dashboard.refresh()
         win.navigate("allocation")
 
     def on_committed(entity_id: str):
-        """After GL commit, refresh GL + TB pages."""
         gl_pg.refresh_entities()
         tb_pg.refresh_entities()
         dashboard.refresh()
@@ -136,13 +143,11 @@ def main():
     import_pg.import_done.connect(on_import_done)
     alloc_pg.committed.connect(on_committed)
 
-    # ── Initial refresh so all dropdowns show existing companies ─────────────
-    coa_pg.refresh_entities()
-    import_pg.refresh_entities()
-    alloc_pg.refresh_entities()
-    gl_pg.refresh_entities()
-    tb_pg.refresh_entities()
+    # ── Initial load ──────────────────────────────────────────────────────────
+    for pg in pages_with_entity:
+        pg.refresh_entities()
     dashboard.refresh()
+    win.refresh_companies()   # sets context → triggers _sync_all
 
     # ── Launch ────────────────────────────────────────────────────────────────
     win.navigate("dashboard")

@@ -5,7 +5,7 @@ Main application shell — navigation sidebar + stacked content area.
 
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
-    QPushButton, QStackedWidget, QLabel, QFrame, QSizePolicy
+    QPushButton, QStackedWidget, QLabel, QFrame, QSizePolicy, QComboBox
 )
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QFont, QColor, QPalette
@@ -56,8 +56,29 @@ class MainWindow(QMainWindow):
         subtitle.setStyleSheet("color:#90B4D4; font-size:10px; background:#16314F;")
         sb_layout.addWidget(subtitle)
 
+        # Active company picker
+        co_frame = QFrame()
+        co_frame.setStyleSheet(f"background:#16314F; border-bottom:1px solid #0F2438;")
+        co_lay = QVBoxLayout(co_frame)
+        co_lay.setContentsMargins(10, 8, 10, 8)
+        co_lay.setSpacing(3)
+        lbl_co = QLabel("Working on:")
+        lbl_co.setStyleSheet("color:#90B4D4; font-size:10px; background:transparent; border:none;")
+        self.cbo_active_company = QComboBox()
+        self.cbo_active_company.setStyleSheet(
+            "QComboBox { background:#0F2438; color:white; border:1px solid #2E6DA4; "
+            "border-radius:4px; padding:4px 8px; font-size:12px; font-weight:bold; }"
+            "QComboBox::drop-down { border:none; }"
+            "QComboBox QAbstractItemView { background:#1B3A5C; color:white; "
+            "selection-background-color:#2E6DA4; border:1px solid #2E6DA4; }"
+        )
+        self.cbo_active_company.setFixedHeight(32)
+        co_lay.addWidget(lbl_co)
+        co_lay.addWidget(self.cbo_active_company)
+        sb_layout.addWidget(co_frame)
+
         spacer_top = QWidget()
-        spacer_top.setFixedHeight(16)
+        spacer_top.setFixedHeight(8)
         spacer_top.setStyleSheet(f"background:{DARK};")
         sb_layout.addWidget(spacer_top)
 
@@ -79,11 +100,11 @@ class MainWindow(QMainWindow):
 
         sb_layout.addStretch()
 
-        version = QLabel("v1.1 · Network Logic")
-        version.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        version.setFixedHeight(36)
-        version.setStyleSheet("color:#506070; font-size:9px; background:#16314F;")
-        sb_layout.addWidget(version)
+        self.lbl_version = QLabel("v1.1")
+        self.lbl_version.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lbl_version.setFixedHeight(36)
+        self.lbl_version.setStyleSheet("color:#506070; font-size:9px; background:#16314F;")
+        sb_layout.addWidget(self.lbl_version)
 
         root.addWidget(self.sidebar)
 
@@ -94,10 +115,38 @@ class MainWindow(QMainWindow):
 
         # Pages are injected by app.py after construction
         self._pages: dict = {}
+        self._company_map: dict = {}
+        self.cbo_active_company.currentIndexChanged.connect(self._on_company_changed)
 
     def add_page(self, key: str, widget: QWidget) -> None:
         self._pages[key] = widget
         self.stack.addWidget(widget)
+
+    def refresh_companies(self) -> None:
+        from core.models import EntityModel
+        import core.context as ctx
+        self.cbo_active_company.blockSignals(True)
+        self.cbo_active_company.clear()
+        self._company_map = {}
+        for e in EntityModel.list_all():
+            self.cbo_active_company.addItem(e["legal_name"])
+            self._company_map[e["legal_name"]] = e["entity_id"]
+        if not self._company_map:
+            self.cbo_active_company.addItem("— add a company first —")
+        # Restore previously selected entity if still available
+        cur = ctx.get_entity_name()
+        idx = self.cbo_active_company.findText(cur)
+        if idx >= 0:
+            self.cbo_active_company.setCurrentIndex(idx)
+        self.cbo_active_company.blockSignals(False)
+        self._on_company_changed()
+
+    def _on_company_changed(self) -> None:
+        import core.context as ctx
+        name = self.cbo_active_company.currentText()
+        eid  = self._company_map.get(name, "")
+        ctx.set_entity(eid, name)
+        self.lbl_version.setText(f"v1.1 · {name[:20]}" if eid else "v1.1")
 
     def navigate(self, key: str) -> None:
         if key in self._pages:
