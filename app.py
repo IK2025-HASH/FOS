@@ -110,62 +110,9 @@ def main():
 
     # ── Auto-seed CoA for ALL existing companies on every startup ────────────
     from core.models import EntityModel, CoAModel
-    from core.database import db as _db
     for _e in EntityModel.list_all():
         CoAModel.seed_standard(_e["entity_id"])
     log.info("CoA auto-seed complete for all companies")
-
-    # ── Clean up cross-company GL entries and GL duplicates ───────────────────
-    _entities = EntityModel.list_all()
-    for _e in _entities:
-        _eid = _e["entity_id"]
-        # Get banks registered for this entity
-        _banks = _db.fetchall(
-            "SELECT account_name FROM entity_banks WHERE entity_id=?", (_eid,)
-        )
-        _bank_prefixes = [
-            f"[{b['account_name'].strip()}]"
-            for b in _banks if b.get("account_name","").strip()
-        ]
-        # Also collect ALL banks from OTHER entities
-        _other_banks = []
-        for _other in _entities:
-            if _other["entity_id"] == _eid:
-                continue
-            _obs = _db.fetchall(
-                "SELECT account_name FROM entity_banks WHERE entity_id=?",
-                (_other["entity_id"],)
-            )
-            for _ob in _obs:
-                _name = (_ob.get("account_name") or "").strip()
-                if _name:
-                    _other_banks.append(f"[{_name}]")
-        # Delete GL rows and approved transactions for this entity whose description
-        # starts with another entity's bank prefix
-        for _pfx in _other_banks:
-            _del_gl = _db.execute(
-                "DELETE FROM gl WHERE entity_id=? AND description LIKE ?",
-                (_eid, f"{_pfx}%")
-            ).rowcount
-            _del_tx = _db.execute(
-                "DELETE FROM transactions WHERE entity_id=? AND description LIKE ? AND status='approved'",
-                (_eid, f"{_pfx}%")
-            ).rowcount
-            if _del_gl or _del_tx:
-                log.info("Removed %d GL + %d tx cross-company entries (%s) from entity %s",
-                         _del_gl, _del_tx, _pfx, _eid)
-        # Deduplicate GL entries (keep lowest gl_id per unique combination)
-        _db.execute("""
-            DELETE FROM gl
-            WHERE entity_id=? AND gl_id NOT IN (
-                SELECT MIN(gl_id)
-                FROM gl
-                WHERE entity_id=?
-                GROUP BY entity_id, account_code, date, description, debit, credit, period
-            )
-        """, (_eid, _eid))
-    _db.commit()
-    log.info("GL cross-company cleanup and deduplication complete")
 
     # ── Main window ───────────────────────────────────────────────────────────
     win = MainWindow()

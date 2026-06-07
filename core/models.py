@@ -353,11 +353,11 @@ class ImportModel:
             desc   = str(row.get("description","")).strip()
             payee  = str(row.get("payee","")).strip()
 
-            # Skip if already staged OR already approved (posted to GL) for this entity
+            # Skip if already staged for this entity
             existing = db.fetchone(
                 """SELECT 1 FROM transactions
                    WHERE entity_id=? AND date=? AND amount=? AND description=?
-                   AND status IN ('staged','approved')
+                   AND status='staged'
                    LIMIT 1""",
                 (entity_id, date, amount, desc)
             )
