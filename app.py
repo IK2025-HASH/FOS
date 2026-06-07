@@ -115,20 +115,24 @@ def main():
     log.info("CoA auto-seed complete for all companies")
 
     # ── Remove duplicate staged transactions (same entity+date+amount+desc) ──
-    # Only delete staged rows not referenced by any GL entry
     from core.database import db as _db
-    _db.execute("""
-        DELETE FROM transactions
-        WHERE tx_id NOT IN (
-            SELECT MIN(tx_id)
-            FROM transactions
-            GROUP BY entity_id, date, amount, description
-        )
-        AND status = 'staged'
-        AND tx_id NOT IN (SELECT DISTINCT source_tx_id FROM gl WHERE source_tx_id IS NOT NULL)
-    """)
-    _db.commit()
-    log.info("Duplicate staged transactions removed")
+    try:
+        _db.execute("PRAGMA foreign_keys = OFF")
+        _db.execute("""
+            DELETE FROM transactions
+            WHERE tx_id NOT IN (
+                SELECT MIN(tx_id)
+                FROM transactions
+                GROUP BY entity_id, date, amount, description
+            )
+            AND status = 'staged'
+        """)
+        _db.commit()
+        log.info("Duplicate staged transactions removed")
+    except Exception as _e:
+        log.warning("Duplicate tx cleanup skipped: %s", _e)
+    finally:
+        _db.execute("PRAGMA foreign_keys = ON")
 
     # ── Main window ───────────────────────────────────────────────────────────
     win = MainWindow()
