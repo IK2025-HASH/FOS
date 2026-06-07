@@ -1050,7 +1050,7 @@ def _export_excel_package(path: str, entity_id: str, r: dict):
              [14, 10, 14, 30, 12, 38, 12, 12, 10, 16])
     gl_rows = db.fetchall(
         f"""SELECT g.date, g.period, g.account_code, c.name AS account_name, c.type,
-                   g.description, g.debit, g.credit, g.vat_amount, g.source_ref
+                   g.description, g.debit, g.credit, g.vat_amount, g.source
             FROM gl g LEFT JOIN coa c ON c.entity_id=g.entity_id AND c.code=g.account_code
             WHERE g.entity_id=? AND g.period IN ({ph}) ORDER BY g.date, g.account_code""",
         [entity_id] + periods
@@ -1060,7 +1060,7 @@ def _export_excel_package(path: str, entity_id: str, r: dict):
             row["date"], row["period"], row["account_code"], row["account_name"],
             row["type"], row["description"],
             float(row["debit"] or 0) or None, float(row["credit"] or 0) or None,
-            float(row["vat_amount"] or 0) or None, row["source_ref"]
+            float(row["vat_amount"] or 0) or None, row["source"]
         ], money_cols={7,8,9})
     ws2.freeze_panes = "A4"
 

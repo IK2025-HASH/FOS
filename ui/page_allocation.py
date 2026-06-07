@@ -343,18 +343,6 @@ class AllocationPage(BasePage):
         if not entity_id:
             return
 
-        # Auto re-run AI on every load so latest rules always apply
-        try:
-            from core.ai_engine import AllocationEngine
-            import logging
-            engine = AllocationEngine(entity_id)
-            engine.train()
-            staged_raw = ImportModel.get_staged(entity_id)
-            if staged_raw:
-                engine.allocate_batch(staged_raw)
-        except Exception as _ai_err:
-            logging.getLogger(__name__).warning("AI re-run failed: %s", _ai_err, exc_info=True)
-
         coa_rows = CoAModel.get_for_entity(entity_id)
         self._coa_map = {r["code"]: r["name"] for r in coa_rows}
 
@@ -486,3 +474,20 @@ class AllocationPage(BasePage):
                 self.cbo_entity.blockSignals(False)
                 break
         self._load()
+        self._auto_allocate_new(entity_id)
+
+    def _auto_allocate_new(self, entity_id: str):
+        """Run AI only on staged transactions that have no account assigned yet."""
+        try:
+            from core.ai_engine import AllocationEngine
+            import logging
+            staged = ImportModel.get_staged(entity_id)
+            unallocated = [t for t in staged if not t.get("account_code")]
+            if unallocated:
+                engine = AllocationEngine(entity_id)
+                engine.train()
+                engine.allocate_batch(unallocated)
+                self._load()
+        except Exception as _e:
+            import logging
+            logging.getLogger(__name__).warning("Auto-allocate failed: %s", _e)
