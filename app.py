@@ -114,26 +114,6 @@ def main():
         CoAModel.seed_standard(_e["entity_id"])
     log.info("CoA auto-seed complete for all companies")
 
-    # ── Remove duplicate staged transactions (same entity+date+amount+desc) ──
-    from core.database import db as _db
-    try:
-        _db.execute("PRAGMA foreign_keys = OFF")
-        _db.execute("""
-            DELETE FROM transactions
-            WHERE tx_id NOT IN (
-                SELECT MIN(tx_id)
-                FROM transactions
-                GROUP BY entity_id, date, amount, description
-            )
-            AND status = 'staged'
-        """)
-        _db.commit()
-        log.info("Duplicate staged transactions removed")
-    except Exception as _e:
-        log.warning("Duplicate tx cleanup skipped: %s", _e)
-    finally:
-        _db.execute("PRAGMA foreign_keys = ON")
-
     # ── Main window ───────────────────────────────────────────────────────────
     win = MainWindow()
 
