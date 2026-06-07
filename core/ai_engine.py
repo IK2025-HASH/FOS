@@ -37,24 +37,70 @@ OS_KEYWORDS = ["transfer","savings","investment","loan","salary","wages","payrol
 
 # ── Common UK payee → account code rules ─────────────────────────────────────
 BUILTIN_RULES = [
-    # (payee_pattern_regex, keyword_regex, account_code, vat_code)
-    (r"amazon web services|aws\b",          None,               "5540", "SR-I"),
-    (r"microsoft|office 365|m365",          None,               "5540", "SR-I"),
-    (r"google workspace|gsuite",            None,               "5540", "SR-I"),
-    (r"zoom|teams|slack|notion",            None,               "5540", "SR-I"),
-    (r"xero|quickbooks|sage",              None,               "5540", "SR-I"),
-    (r"bt |virgin media|sky broadband|vodafone|o2|ee\b|three\b", None, "5520", "SR-I"),
-    (r"british gas|eon\b|edf|npower|bulb",  None,               "5510", "SR-I"),
-    (r"royal mail|parcelforce|hermes|dpd|ups\b|fedex", None,    "5030", "SR-I"),
-    (r"barclays|lloyds|natwest|hsbc|monzo|starling|santander",
-                                            r"charge|fee",      "5600", "EX"),
-    (r"council|rates",                      None,               "5500", "EX"),
-    (r"hmrc|hm revenue",                    r"vat|paye|tax",    "2200", "OS"),
-    (r"insurance",                          None,               "5530", "EX"),
-    (r"companies house",                    None,               "5590", "EX"),
-    (r"linkedin|facebook ads|google ads|meta ads", None,        "5550", "SR-I"),
-    (r"uber|lyft|trainline|national rail|avanti|gwr", None,     "5560", "SR-I"),
-    (r"tesco|sainsbury|asda|waitrose|costa|starbucks|pret", None,"5570", "SR-I"),
+    # ── Technology / Subscriptions ────────────────────────────────────────────
+    (r"amazon web services|aws\b",                    None,          "5540", "SR-I"),
+    (r"microsoft|office 365|m365",                    None,          "5540", "SR-I"),
+    (r"google workspace|gsuite|google cloud",         None,          "5540", "SR-I"),
+    (r"zoom|teams|slack|notion|dropbox|github",       None,          "5540", "SR-I"),
+    (r"xero|quickbooks|sage|clearbooks",              None,          "5540", "SR-I"),
+    (r"adobe|canva|figma|mailchimp|klaviyo",          None,          "5540", "SR-I"),
+    (r"godaddy|wix|shopify|squarespace",              None,          "5540", "SR-I"),
+    (r"paypal",                                       r"subscription|fee|service", "5540", "SR-I"),
+    # ── Phone / Internet ─────────────────────────────────────────────────────
+    (r"bt |virgin media|sky broadband|vodafone|o2\b|ee\b|three\b|talktalk", None, "5520", "SR-I"),
+    # ── Utilities ────────────────────────────────────────────────────────────
+    (r"british gas|eon\b|edf|npower|bulb|octopus energy|sse\b|e\.on", None, "5510", "SR-I"),
+    (r"thames water|severn trent|united utilities|anglian water",      None, "5510", "EX"),
+    # ── Postage / Couriers ────────────────────────────────────────────────────
+    (r"royal mail|parcelforce|hermes|dpd|ups\b|fedex|evri|yodel",     None, "5555", "SR-I"),
+    # ── Bank charges ─────────────────────────────────────────────────────────
+    (r"barclays|lloyds|natwest|hsbc|monzo|starling|santander|halifax|nationwide",
+                                                      r"charge|fee|interest", "5600", "EX"),
+    # ── Rent / Rates ─────────────────────────────────────────────────────────
+    (r"council tax|business rates",                   None,          "5500", "EX"),
+    (r"council\b",                                    r"rates|tax",  "5500", "EX"),
+    # ── HMRC / Tax ───────────────────────────────────────────────────────────
+    (r"hmrc|hm revenue|hm customs",                   r"vat",        "2100", "OS"),
+    (r"hmrc|hm revenue",                              r"paye|nic|payroll", "2200", "OS"),
+    (r"hmrc|hm revenue",                              r"corporation|ct",   "2300", "OS"),
+    (r"hmrc|hm revenue",                              None,          "2200", "OS"),
+    # ── Insurance ────────────────────────────────────────────────────────────
+    (r"insurance|aviva|axa|zurich|direct line|admiral|churchill", None, "5530", "EX"),
+    # ── Professional / Legal ─────────────────────────────────────────────────
+    (r"companies house",                              None,          "5590", "EX"),
+    (r"accountant|solicitor|legal\b|barrister|lawyer", None,         "5590", "SR-I"),
+    # ── Advertising / Marketing ───────────────────────────────────────────────
+    (r"linkedin|facebook ads|google ads|meta ads|instagram ads|tiktok ads", None, "5550", "SR-I"),
+    # ── Travel ───────────────────────────────────────────────────────────────
+    (r"uber\b|bolt\b|lyft|black cab|addison lee",     None,          "5560", "SR-I"),
+    (r"trainline|national rail|avanti|gwr|lner|tfl\b|crossrail", None,"5560", "SR-I"),
+    (r"premier inn|travelodge|holiday inn|marriott|hilton|airbnb", None,"5560", "SR-I"),
+    (r"british airways|easyjet|ryanair|jet2|wizz air|emirates",   None,"5560", "SR-I"),
+    # ── Motor / Fuel ─────────────────────────────────────────────────────────
+    (r"asda petrol|bp\b|shell\b|esso|texaco|total\b|gulf\b|jet\b", None, "5580", "SR-I"),
+    (r"petrol|diesel|fuel\b",                         None,          "5580", "SR-I"),
+    (r"dvla\b|mot\b|car insurance|vehicle tax",       None,          "5580", "EX"),
+    # ── Food / Meals (cafe/restaurant) ───────────────────────────────────────
+    (r"tesco|sainsbury|asda\b|waitrose|morrisons|aldi|lidl|m&s food|marks.*spencer.*food", None, "5570", "SR-I"),
+    (r"costa|starbucks|pret|greggs|cafe|restaurant|nando|mcdonalds|kfc\b|subway\b|pizza", None, "5570", "SR-I"),
+    (r"just.?eat|deliveroo|uber eats",                None,          "5570", "SR-I"),
+    # ── Office Supplies ───────────────────────────────────────────────────────
+    (r"staples|ryman|viking|currys|argos|ikea|amazon\b", r"office|supplies|stationery|paper|ink|printer", "5545", "SR-I"),
+    # ── Cleaning ─────────────────────────────────────────────────────────────
+    (r"cleaning|laundry|dry clean|dyson|hoover",      None,          "5565", "SR-I"),
+    # ── Maintenance / Repairs ─────────────────────────────────────────────────
+    (r"screwfix|b&q|wickes|travis perkins|jewson|tool",None,         "5585", "SR-I"),
+    # ── Salaries / Wages ─────────────────────────────────────────────────────
+    (r"salary|wages|payroll|bacs.*salary",             None,          "5700", "OS"),
+    (r"pension|nest\b|peoples pension|auto.?enrolment",None,          "5720", "OS"),
+    # ── Charitable ───────────────────────────────────────────────────────────
+    (r"mosque|masjid|charity|donation|islamic relief|red cross|oxfam|comic relief|just.?giving|cancer research", None, "5595", "OS"),
+    # ── Sumup / Card readers (income for cafes) ───────────────────────────────
+    (r"sumup|izettle|square\b|worldpay|stripe\b|paypoint", None,     "4000", "SR-O"),
+    # ── Amazon general purchases ──────────────────────────────────────────────
+    (r"amazon\b",                                     None,          "5620", "SR-I"),
+    # ── PayPal general ───────────────────────────────────────────────────────
+    (r"paypal",                                       None,          "5620", "SR-I"),
 ]
 
 
@@ -92,8 +138,8 @@ class AllocationEngine:
         amount     = float(tx.get("amount", 0))
         combined   = f"{payee} {desc}".strip()
 
-        # 0. Internal transfer — payee/desc matches a known bank of this entity
-        if self._is_internal_transfer(combined):
+        # 0. Internal transfer — payee matches a known bank of this entity
+        if self._is_internal_transfer(payee, desc):
             return self._result(tx_id, "9000", "OS", 97.0, "internal_transfer")
 
         # 1. Rule library (user-created rules — highest priority)
@@ -253,20 +299,44 @@ class AllocationEngine:
              alloc["rule_id"], alloc["override"])
         )
 
-    def _is_internal_transfer(self, text: str) -> bool:
-        """Return True if the text matches one of the entity's own bank account names."""
+    def _is_internal_transfer(self, payee: str, desc: str) -> bool:
+        """
+        True only when a transaction is genuinely moving money between the
+        entity's OWN bank accounts.
+
+        Rules:
+        - Bank name match: the PAYEE (not description) must be solely or
+          primarily the name of one of the entity's other bank accounts,
+          using whole-word matching so '[Starling] PayPal' does NOT match.
+        - Explicit keywords in the combined text must be strong phrases —
+          single word 'transfer' is not enough.
+        """
         banks = db.fetchall(
             "SELECT account_name FROM entity_banks WHERE entity_id=?",
             (self.entity_id,)
         )
-        for b in banks:
-            name = (b.get("account_name") or "").lower().strip()
-            if name and len(name) > 3 and name in text:
+        bank_names = [
+            (b.get("account_name") or "").lower().strip()
+            for b in banks
+            if len((b.get("account_name") or "").strip()) > 3
+        ]
+
+        # Only match if the payee IS the bank name (whole word, payee field only)
+        payee_clean = payee.strip()
+        for name in bank_names:
+            pattern = r'\b' + re.escape(name) + r'\b'
+            if re.fullmatch(re.escape(name), payee_clean, re.I):
                 return True
-        # Also catch common transfer keywords
-        transfer_kw = ["internal transfer", "own account", "savings transfer",
-                       "bank transfer to", "transfer to ", "transfer from "]
-        return any(kw in text for kw in transfer_kw)
+            # e.g. payee is "Transfer to Starling" — explicit transfer phrase + bank name
+            if re.search(r'\b(transfer|move)\b', payee_clean, re.I) and \
+               re.search(pattern, payee_clean, re.I):
+                return True
+
+        # Explicit strong transfer phrases in description
+        combined = f"{payee} {desc}"
+        strong_kw = ["internal transfer", "own account transfer",
+                     "savings transfer", "bank transfer to ", "transfer to savings"]
+        return any(kw in combined for kw in strong_kw)
 
     def _refresh(self) -> None:
         """Reload CoA and rule library from DB."""
