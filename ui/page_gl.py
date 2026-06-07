@@ -252,10 +252,20 @@ class GLPage(BasePage):
         self.tbl.setColumnWidth(5, 60)
         self.tbl.setColumnWidth(6, 90)
         self.tbl.setColumnWidth(7, 70)
+        from PyQt6.QtWidgets import QAbstractItemView
+        self.tbl.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.tbl.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
         gl_card.body().addWidget(self.tbl)
         self.layout_.addWidget(gl_card)
 
         exp_row = QHBoxLayout()
+        self.btn_delete = SecondaryButton("🗑  Delete Selected Entries")
+        self.btn_delete.setStyleSheet(
+            "border:1px solid #E74C3C; color:#E74C3C; background:white; "
+            "border-radius:4px; padding:6px 14px; font-size:13px;"
+        )
+        self.btn_delete.clicked.connect(self._delete_selected)
+        exp_row.addWidget(self.btn_delete)
         exp_row.addStretch()
         for fmt in ["CSV", "Excel", "PDF"]:
             btn = SecondaryButton(f"⬇  Export {fmt}")
@@ -340,6 +350,7 @@ class GLPage(BasePage):
         self.cbo_period.blockSignals(False)
 
         self.tbl.setRowCount(0)
+        self._gl_ids = []   # parallel list of gl_id per row
         total_debit = 0.0
         total_credit = 0.0
         for i, e in enumerate(entries):
@@ -347,6 +358,7 @@ class GLPage(BasePage):
             credit = float(e.get("credit",0))
             total_debit  += debit
             total_credit += credit
+            self._gl_ids.append(e.get("gl_id",""))
             set_row(self.tbl, i, [
                 e["date"][:10],
                 e["account_code"],
@@ -368,6 +380,38 @@ class GLPage(BasePage):
         )
         self.lbl_summary.setStyleSheet(f"color:{colour}; font-size:12px; font-weight:bold;")
         self._gl_entries = entries
+
+    def _delete_selected(self):
+        import core.context as ctx
+        entity_id = ctx.get_entity_id() or self._entity_map.get(self.cbo_entity.currentText(), "")
+        rows = sorted(set(idx.row() for idx in self.tbl.selectedIndexes()))
+        if not rows:
+            error(self, "Nothing selected", "Click rows to select them, then press Delete Selected.")
+            return
+        ids_to_delete = [self._gl_ids[r] for r in rows if r < len(self._gl_ids) and self._gl_ids[r]]
+        if not ids_to_delete:
+            error(self, "No IDs", "Cannot identify selected GL entries.")
+            return
+        if not confirm(self, "Delete GL Entries",
+                       f"Permanently delete {len(ids_to_delete)} GL entry pairs?\n\n"
+                       "Use this to remove wrongly-committed transactions.\n"
+                       "This cannot be undone."):
+            return
+        ph = ",".join("?" * len(ids_to_delete))
+        # Delete the paired entries sharing the same batch_id
+        batch_ids = [r["batch_id"] for r in db.fetchall(
+            f"SELECT DISTINCT batch_id FROM gl WHERE gl_id IN ({ph})", ids_to_delete
+        ) if r.get("batch_id")]
+        if batch_ids:
+            bph = ",".join("?" * len(batch_ids))
+            db.execute(f"DELETE FROM gl WHERE batch_id IN ({bph}) AND entity_id=?",
+                       batch_ids + [entity_id])
+        else:
+            db.execute(f"DELETE FROM gl WHERE gl_id IN ({ph}) AND entity_id=?",
+                       ids_to_delete + [entity_id])
+        db.commit()
+        info(self, "Deleted", f"{len(ids_to_delete)} entry pair(s) removed from GL.")
+        self._load()
 
     def _export(self, fmt: str):
         company = self.cbo_entity.currentText()
