@@ -294,16 +294,29 @@ class ReportsPage(BasePage):
 
         lay.addLayout(breakdown_row)
 
-        # ── Accountant sign-off ───────────────────────────────────────────────
-        sign_card = Card("Accountant Sign-Off")
+        # ── Director / Officer sign-off ───────────────────────────────────────
+        sign_card = Card("Director / Officer Approval")
         sb = sign_card.body()
 
+        # Info note
+        note_info = QLabel(
+            "ℹ  The director or company officer approves this report in FOS. "
+            "The generated PDF includes a physical countersignature block so your "
+            "external accountant can review and countersign offline."
+        )
+        note_info.setStyleSheet(
+            f"color:{ACCENT}; font-size:12px; background:#EAF3FB; "
+            f"border-radius:4px; padding:8px 10px; border:1px solid #B3D4F0;"
+        )
+        note_info.setWordWrap(True)
+        sb.addWidget(note_info)
+
         row_name = QHBoxLayout()
-        lbl_name = QLabel("Prepared by:")
+        lbl_name = QLabel("Approved by:")
         lbl_name.setStyleSheet(f"color:{TEXT}; font-size:13px;")
-        lbl_name.setFixedWidth(160)
+        lbl_name.setFixedWidth(180)
         self.f_preparer = QLineEdit()
-        self.f_preparer.setPlaceholderText("Full name of accountant / director")
+        self.f_preparer.setPlaceholderText("Director / company officer full name")
         self.f_preparer.setFixedHeight(34)
         self.f_preparer.setStyleSheet(
             f"border:1px solid {BORDER}; border-radius:4px; padding:0 10px; font-size:13px;"
@@ -315,9 +328,9 @@ class ReportsPage(BasePage):
         row_role = QHBoxLayout()
         lbl_role = QLabel("Role:")
         lbl_role.setStyleSheet(f"color:{TEXT}; font-size:13px;")
-        lbl_role.setFixedWidth(160)
+        lbl_role.setFixedWidth(180)
         self.f_role = QLineEdit()
-        self.f_role.setPlaceholderText("e.g. Director, Accountant, Finance Manager")
+        self.f_role.setPlaceholderText("e.g. Director, Company Secretary, Finance Officer")
         self.f_role.setFixedHeight(34)
         self.f_role.setStyleSheet(
             f"border:1px solid {BORDER}; border-radius:4px; padding:0 10px; font-size:13px;"
@@ -326,10 +339,38 @@ class ReportsPage(BasePage):
         row_role.addWidget(self.f_role)
         sb.addLayout(row_role)
 
+        row_acct = QHBoxLayout()
+        lbl_acct = QLabel("External Accountant:")
+        lbl_acct.setStyleSheet(f"color:{TEXT}; font-size:13px;")
+        lbl_acct.setFixedWidth(180)
+        self.f_accountant = QLineEdit()
+        self.f_accountant.setPlaceholderText("Accountant name (for PDF — optional)")
+        self.f_accountant.setFixedHeight(34)
+        self.f_accountant.setStyleSheet(
+            f"border:1px solid {BORDER}; border-radius:4px; padding:0 10px; font-size:13px;"
+        )
+        row_acct.addWidget(lbl_acct)
+        row_acct.addWidget(self.f_accountant)
+        sb.addLayout(row_acct)
+
+        row_acct_email = QHBoxLayout()
+        lbl_acct_email = QLabel("Accountant Email:")
+        lbl_acct_email.setStyleSheet(f"color:{TEXT}; font-size:13px;")
+        lbl_acct_email.setFixedWidth(180)
+        self.f_accountant_email = QLineEdit()
+        self.f_accountant_email.setPlaceholderText("accountant@firm.co.uk (optional — pre-fills email step)")
+        self.f_accountant_email.setFixedHeight(34)
+        self.f_accountant_email.setStyleSheet(
+            f"border:1px solid {BORDER}; border-radius:4px; padding:0 10px; font-size:13px;"
+        )
+        row_acct_email.addWidget(lbl_acct_email)
+        row_acct_email.addWidget(self.f_accountant_email)
+        sb.addLayout(row_acct_email)
+
         row_notes = QHBoxLayout()
         lbl_notes = QLabel("Notes:")
         lbl_notes.setStyleSheet(f"color:{TEXT}; font-size:13px;")
-        lbl_notes.setFixedWidth(160)
+        lbl_notes.setFixedWidth(180)
         self.f_notes = QTextEdit()
         self.f_notes.setPlaceholderText("Optional — any notes or qualifications to include in the report")
         self.f_notes.setFixedHeight(70)
@@ -343,11 +384,15 @@ class ReportsPage(BasePage):
         btn_row = QHBoxLayout()
         self.btn_back1 = SecondaryButton("← Back")
         self.btn_back1.clicked.connect(lambda: self._go_step(0))
+        self.btn_excel_pkg = SecondaryButton("📊 Export Review Package (Excel)")
+        self.btn_excel_pkg.setFixedWidth(270)
+        self.btn_excel_pkg.clicked.connect(self._export_review_package)
         self.btn_approve = PrimaryButton("Approve & Generate PDF  →", colour=SUCCESS)
         self.btn_approve.setFixedWidth(260)
         self.btn_approve.clicked.connect(self._approve)
         btn_row.addWidget(self.btn_back1)
         btn_row.addStretch()
+        btn_row.addWidget(self.btn_excel_pkg)
         btn_row.addWidget(self.btn_approve)
         sb.addLayout(btn_row)
 
@@ -373,7 +418,7 @@ class ReportsPage(BasePage):
         lbl_to = QLabel("Send to:")
         lbl_to.setStyleSheet(f"color:{TEXT}; font-size:13px;")
         lbl_to.setFixedWidth(100)
-        self.cbo_email_type = ComboField(["HMRC MTD Agent","Company Director","Accountant","Custom"])
+        self.cbo_email_type = ComboField(["External Accountant (Offline Review)","HMRC MTD Agent","Company Director","Custom"])
         self.cbo_email_type.setMinimumWidth(200)
         self.cbo_email_type.currentIndexChanged.connect(self._prefill_email)
         self.f_email_to = QLineEdit()
@@ -591,6 +636,37 @@ class ReportsPage(BasePage):
             ap = e["approver"]
             self.f_preparer.setText(ap.get("name",""))
             self.f_role.setText(ap.get("role","Director"))
+            self.f_accountant.setText(ap.get("accountant_name",""))
+            self.f_accountant_email.setText(ap.get("accountant_email",""))
+
+    # ── Step 2: Export review package ────────────────────────────────────────
+
+    def _export_review_package(self):
+        if not self._entity_id or not self._report:
+            error(self, "No Report", "Generate the report first (Step 1).")
+            return
+        r = self._report
+        ent_name = self._entity_name.replace(" ", "_")
+        fy_short = r.get("fy_label", "")[:10].replace("/","_")
+        default = os.path.join(
+            os.path.expanduser("~"), "Desktop",
+            f"OfflineReview_{ent_name}_{fy_short}.xlsx"
+        )
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save Offline Review Package", default,
+            "Excel Files (*.xlsx)"
+        )
+        if not path:
+            return
+        try:
+            _export_excel_package(path, self._entity_id, r)
+            info(self, "Package Exported",
+                 f"Offline review package saved to:\n{path}\n\n"
+                 f"Send this Excel file to your accountant — it contains:\n"
+                 f"  • Bank Statements\n  • General Ledger\n  • Trial Balance\n"
+                 f"  • Year-End P&L Summary")
+        except Exception as exc:
+            error(self, "Export Failed", str(exc))
 
     # ── Step 3: Approve + PDF ─────────────────────────────────────────────────
 
@@ -601,10 +677,12 @@ class ReportsPage(BasePage):
             error(self, "Sign-Off Required", "Enter the name of the person approving this report.")
             return
 
-        self._report["preparer"] = preparer
-        self._report["role"]     = role
-        self._report["notes"]    = self.f_notes.toPlainText().strip()
-        self._report["signed_at"] = datetime.utcnow().strftime("%d %b %Y %H:%M UTC")
+        self._report["preparer"]         = preparer
+        self._report["role"]             = role
+        self._report["accountant"]       = self.f_accountant.text().strip()
+        self._report["accountant_email"] = self.f_accountant_email.text().strip()
+        self._report["notes"]            = self.f_notes.toPlainText().strip()
+        self._report["signed_at"]        = datetime.utcnow().strftime("%d %b %Y %H:%M UTC")
 
         # Save PDF
         default = os.path.join(
@@ -640,29 +718,46 @@ class ReportsPage(BasePage):
         profit  = r.get("net_profit", 0.0)
 
         etype = self.cbo_email_type.currentText()
+        acct_email = r.get("accountant_email", "")
+        acct_name  = r.get("accountant", "your accountant")
         email_map = {
+            "External Accountant (Offline Review)": acct_email,
             "HMRC MTD Agent":    "agent.services@hmrc.gov.uk",
             "Company Director":  "",
-            "Accountant":        "",
             "Custom":            "",
         }
         self.f_email_to.setText(email_map.get(etype, ""))
 
-        subj = f"Period Report — {ent} — {fy}"
+        subj = f"Period Report for Offline Review — {ent} — {fy}"
         self.f_email_subj.setText(subj)
 
-        body = (
-            f"Dear {etype},\n\n"
-            f"Please find attached the accountant's period report for {ent} "
-            f"covering {fy}.\n\n"
-            f"Summary:\n"
-            f"  Total Income:    £{income:,.2f}\n"
-            f"  Total Expenses:  £{expense:,.2f}\n"
-            f"  Net Profit/Loss: £{profit:,.2f}\n\n"
-            f"The report has been prepared and approved by {prepared_by}.\n\n"
-            f"Please review the attached PDF report.\n\n"
-            f"Kind regards,\n{prepared_by}"
-        )
+        if etype == "External Accountant (Offline Review)":
+            salutation = f"Dear {acct_name}" if acct_name and acct_name != "your accountant" else "Dear Accountant"
+            body = (
+                f"{salutation},\n\n"
+                f"Please find attached the period report for {ent} covering {fy}, "
+                f"approved by {prepared_by} ({r.get('role','Director')}).\n\n"
+                f"Summary:\n"
+                f"  Total Income:    £{income:,.2f}\n"
+                f"  Total Expenses:  £{expense:,.2f}\n"
+                f"  Net Profit/Loss: £{profit:,.2f}\n\n"
+                f"The PDF includes a countersignature block on the final page for your "
+                f"offline review and sign-off. Please print, sign, and return a copy "
+                f"for our records.\n\n"
+                f"Kind regards,\n{prepared_by}\n{r.get('role','Director')}, {ent}"
+            )
+        else:
+            body = (
+                f"Dear {etype},\n\n"
+                f"Please find attached the period report for {ent} "
+                f"covering {fy}.\n\n"
+                f"Summary:\n"
+                f"  Total Income:    £{income:,.2f}\n"
+                f"  Total Expenses:  £{expense:,.2f}\n"
+                f"  Net Profit/Loss: £{profit:,.2f}\n\n"
+                f"Approved by {prepared_by}.\n\n"
+                f"Kind regards,\n{prepared_by}"
+            )
         self.f_email_body.setPlainText(body)
 
     def _open_pdf(self):
@@ -809,13 +904,13 @@ def _generate_pdf(path: str, r: dict):
     elems.append(Spacer(1, 10))
     elems.append(HRFlowable(width="100%", thickness=0.5, color=muted))
     elems.append(Spacer(1, 6))
-    elems.append(Paragraph("Accountant's Declaration", h2))
+    elems.append(Paragraph("Director / Officer Approval", h2))
     elems.append(Paragraph(
-        f"I confirm that to the best of my knowledge the information contained in this report "
-        f"is accurate and complete for the period stated.", body_s))
+        f"I, the undersigned, confirm that to the best of my knowledge the information "
+        f"contained in this report is accurate and complete for the period stated.", body_s))
     elems.append(Spacer(1, 6))
     sign_data = [
-        ["Prepared by:", r.get("preparer","")],
+        ["Approved by:", r.get("preparer","")],
         ["Role:",        r.get("role","")],
         ["Date:",        r.get("signed_at","")],
     ]
@@ -830,12 +925,218 @@ def _generate_pdf(path: str, r: dict):
         ("BOTTOMPADDING",(0,0),(-1,-1), 5),
     ]))
     elems.append(sign_tbl)
-    elems.append(Spacer(1, 20))
+    elems.append(Spacer(1, 16))
     elems.append(Paragraph(
-        "Signature: ___________________________________     Date: _______________",
+        "Director Signature: ___________________________________     Date: _______________",
         body_s))
 
+    # ── Accountant offline countersignature block ─────────────────────────────
+    elems.append(Spacer(1, 16))
+    elems.append(HRFlowable(width="100%", thickness=0.5, color=muted))
+    elems.append(Spacer(1, 8))
+    elems.append(Paragraph("External Accountant — Offline Review &amp; Countersignature", h2))
+    elems.append(Paragraph(
+        "This section is to be completed by the external accountant / auditor after "
+        "offline review. The accountant does not require access to FOS to countersign.",
+        body_s))
+    elems.append(Spacer(1, 8))
+    acct_name = r.get("accountant", "")
+    acct_data = [
+        ["Accountant Name:", acct_name if acct_name else "___________________________________"],
+        ["Firm / Practice:", "___________________________________"],
+        ["Review Date:",     "___________________________________"],
+        ["Comments:",        ""],
+    ]
+    acct_tbl = Table(acct_data, colWidths=["30%","70%"])
+    acct_tbl.setStyle(TableStyle([
+        ("FONTNAME",  (0,0), (0,-1), "Helvetica-Bold"),
+        ("TEXTCOLOR", (0,0), (0,-1), dark),
+        ("FONTSIZE",  (0,0), (-1,-1), 10),
+        ("TOPPADDING",(0,0), (-1,-1), 7),
+        ("BOTTOMPADDING",(0,0),(-1,-1), 7),
+        ("ROWBACKGROUNDS", (0,0), (-1,-1), [colors.white, light]),
+        ("GRID", (0,0), (-1,-1), 0.25, colors.HexColor("#D5E8F7")),
+        ("LEFTPADDING",(0,0),(-1,-1), 8),
+        ("MINROWHEIGHT", (0,3), (-1,3), 50),
+    ]))
+    elems.append(acct_tbl)
+    elems.append(Spacer(1, 20))
+    elems.append(Paragraph(
+        "Accountant Signature: ___________________________________     Date: _______________",
+        body_s))
+    elems.append(Spacer(1, 8))
+    elems.append(Paragraph(
+        "I confirm I have reviewed this period report and it fairly represents the financial "
+        "position of the company for the period stated.",
+        muted_s))
+
     doc.build(elems)
+
+
+def _export_excel_package(path: str, entity_id: str, r: dict):
+    """Export a multi-sheet Excel workbook for offline accountant review."""
+    try:
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        from openpyxl.utils import get_column_letter
+    except ImportError:
+        import subprocess, sys
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "openpyxl"])
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        from openpyxl.utils import get_column_letter
+
+    wb = openpyxl.Workbook()
+    wb.remove(wb.active)  # remove default sheet
+
+    dark_fill  = PatternFill("solid", fgColor="1B3A5C")
+    hdr_font   = Font(name="Calibri", bold=True, color="FFFFFF", size=11)
+    title_font = Font(name="Calibri", bold=True, color="1B3A5C", size=13)
+    bold_font  = Font(name="Calibri", bold=True, color="1B3A5C", size=10)
+    norm_font  = Font(name="Calibri", size=10)
+    alt_fill   = PatternFill("solid", fgColor="F4F7FB")
+    thin       = Side(style="thin", color="D5E8F7")
+    border     = Border(left=thin, right=thin, top=thin, bottom=thin)
+    money_fmt  = '#,##0.00'
+    periods    = r.get("periods", [])
+    ph         = ",".join("?" * len(periods)) if periods else "''"
+
+    def _hdr_row(ws, row_idx, values, col_widths=None):
+        for c, val in enumerate(values, 1):
+            cell = ws.cell(row=row_idx, column=c, value=val)
+            cell.fill  = dark_fill
+            cell.font  = hdr_font
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+            cell.border = border
+        if col_widths:
+            for c, w in enumerate(col_widths, 1):
+                ws.column_dimensions[get_column_letter(c)].width = w
+
+    def _data_row(ws, row_idx, values, money_cols=None, bold=False):
+        fill = alt_fill if row_idx % 2 == 0 else PatternFill()
+        for c, val in enumerate(values, 1):
+            cell = ws.cell(row=row_idx, column=c, value=val)
+            cell.fill   = fill
+            cell.font   = bold_font if bold else norm_font
+            cell.border = border
+            if money_cols and c in money_cols:
+                cell.number_format = money_fmt
+                cell.alignment = Alignment(horizontal="right")
+
+    # ── Sheet 1: Bank Statements ──────────────────────────────────────────────
+    ws1 = wb.create_sheet("Bank Statements")
+    ws1.cell(1, 1, f"Bank Statements — {r.get('entity_name','')} — {r.get('fy_label','')}").font = title_font
+    ws1.row_dimensions[1].height = 22
+    _hdr_row(ws1, 3, ["Date","Description","Debit £","Credit £","Balance £","Period","Account"],
+             [14, 42, 14, 14, 14, 10, 16])
+    bank_rows = db.fetchall(
+        f"SELECT date, description, debit, credit, period, account_code FROM gl "
+        f"WHERE entity_id=? AND account_code='1000' AND period IN ({ph}) ORDER BY date",
+        [entity_id] + periods
+    ) if periods else []
+    bal = r.get("opening_balance", 0.0)
+    for i, row in enumerate(bank_rows, 4):
+        d = float(row["debit"] or 0)
+        c = float(row["credit"] or 0)
+        bal += d - c
+        _data_row(ws1, i, [row["date"], row["description"], d or None, c or None, bal,
+                            row["period"], row["account_code"]], money_cols={3,4,5})
+    ws1.freeze_panes = "A4"
+
+    # ── Sheet 2: General Ledger ───────────────────────────────────────────────
+    ws2 = wb.create_sheet("General Ledger")
+    ws2.cell(1, 1, f"General Ledger — {r.get('entity_name','')} — {r.get('fy_label','')}").font = title_font
+    _hdr_row(ws2, 3, ["Date","Period","Account Code","Account Name","Type","Description","Debit £","Credit £","VAT £","Ref"],
+             [14, 10, 14, 30, 12, 38, 12, 12, 10, 16])
+    gl_rows = db.fetchall(
+        f"""SELECT g.date, g.period, g.account_code, c.name AS account_name, c.type,
+                   g.description, g.debit, g.credit, g.vat_amount, g.source_ref
+            FROM gl g LEFT JOIN coa c ON c.entity_id=g.entity_id AND c.code=g.account_code
+            WHERE g.entity_id=? AND g.period IN ({ph}) ORDER BY g.date, g.account_code""",
+        [entity_id] + periods
+    ) if periods else []
+    for i, row in enumerate(gl_rows, 4):
+        _data_row(ws2, i, [
+            row["date"], row["period"], row["account_code"], row["account_name"],
+            row["type"], row["description"],
+            float(row["debit"] or 0) or None, float(row["credit"] or 0) or None,
+            float(row["vat_amount"] or 0) or None, row["source_ref"]
+        ], money_cols={7,8,9})
+    ws2.freeze_panes = "A4"
+
+    # ── Sheet 3: Trial Balance ────────────────────────────────────────────────
+    ws3 = wb.create_sheet("Trial Balance")
+    ws3.cell(1, 1, f"Trial Balance — {r.get('entity_name','')} — {r.get('fy_label','')}").font = title_font
+    _hdr_row(ws3, 3, ["Code","Account","Type","Total Debits £","Total Credits £","Net £"],
+             [10, 36, 12, 16, 16, 16])
+    tb_rows = db.fetchall(
+        f"""SELECT g.account_code, c.name, c.type,
+                   COALESCE(SUM(g.debit),0) AS total_dr,
+                   COALESCE(SUM(g.credit),0) AS total_cr
+            FROM gl g LEFT JOIN coa c ON c.entity_id=g.entity_id AND c.code=g.account_code
+            WHERE g.entity_id=? AND g.period IN ({ph})
+            GROUP BY g.account_code, c.name, c.type ORDER BY g.account_code""",
+        [entity_id] + periods
+    ) if periods else []
+    for i, row in enumerate(tb_rows, 4):
+        dr = float(row["total_dr"] or 0)
+        cr = float(row["total_cr"] or 0)
+        _data_row(ws3, i, [row["account_code"], row["name"], row["type"], dr, cr, dr - cr],
+                  money_cols={4,5,6})
+    # Totals row
+    if tb_rows:
+        tot_i = len(tb_rows) + 4
+        total_dr = sum(float(r2["total_dr"] or 0) for r2 in tb_rows)
+        total_cr = sum(float(r2["total_cr"] or 0) for r2 in tb_rows)
+        _data_row(ws3, tot_i, ["","TOTAL","", total_dr, total_cr, total_dr - total_cr],
+                  money_cols={4,5,6}, bold=True)
+    ws3.freeze_panes = "A4"
+
+    # ── Sheet 4: Year-End P&L Summary ────────────────────────────────────────
+    ws4 = wb.create_sheet("Year-End Summary")
+    ws4.cell(1, 1, f"Year-End P&L Summary — {r.get('entity_name','')} — {r.get('fy_label','')}").font = title_font
+    row_n = 3
+
+    def _section(label):
+        nonlocal row_n
+        cell = ws4.cell(row_n, 1, label)
+        cell.font = Font(name="Calibri", bold=True, color="FFFFFF", size=11)
+        cell.fill = dark_fill
+        ws4.merge_cells(start_row=row_n, start_column=1, end_row=row_n, end_column=3)
+        row_n += 1
+
+    def _line(label, val, bold=False):
+        nonlocal row_n
+        ws4.cell(row_n, 1, label).font = bold_font if bold else norm_font
+        c = ws4.cell(row_n, 2, val)
+        c.number_format = money_fmt
+        c.alignment = Alignment(horizontal="right")
+        c.font = bold_font if bold else norm_font
+        row_n += 1
+
+    _section("Bank Reconciliation")
+    _line("Opening Balance", r.get("opening_balance", 0))
+    _line("+ Money In",      r.get("money_in", 0))
+    _line("− Money Out",     r.get("money_out", 0))
+    _line("= Closing Balance", r.get("closing_balance", 0), bold=True)
+    row_n += 1
+
+    _section("Profit & Loss")
+    for inc in r.get("income_rows", []):
+        _line(f"  {inc['account_code']}  {inc['name']}", float(inc["total"]))
+    _line("Total Income", r.get("total_income", 0), bold=True)
+    row_n += 1
+    for exp in r.get("expense_rows", []):
+        _line(f"  {exp['account_code']}  {exp['name']} ({exp['type']})", float(exp["total"]))
+    _line("Total Expenses", r.get("total_expenses", 0), bold=True)
+    row_n += 1
+    _line("Net Profit / (Loss)", r.get("net_profit", 0), bold=True)
+    _line("Total VAT Collected",  r.get("total_vat", 0))
+
+    ws4.column_dimensions["A"].width = 46
+    ws4.column_dimensions["B"].width = 18
+
+    wb.save(path)
 
 
 def _append_breakdown(elems, data, dark, light):
