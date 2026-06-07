@@ -301,39 +301,36 @@ class AllocationEngine:
 
     def _is_internal_transfer(self, payee: str, desc: str) -> bool:
         """
-        True only when a transaction is genuinely moving money between the
-        entity's OWN bank accounts.
-
-        Rules:
-        - Bank name match: the PAYEE (not description) must be solely or
-          primarily the name of one of the entity's other bank accounts,
-          using whole-word matching so '[Starling] PayPal' does NOT match.
-        - Explicit keywords in the combined text must be strong phrases —
-          single word 'transfer' is not enough.
+        True only when money is genuinely moving between the entity's OWN
+        bank accounts. If the entity has only ONE bank account, internal
+        transfers are impossible — always return False.
         """
         banks = db.fetchall(
             "SELECT account_name FROM entity_banks WHERE entity_id=?",
             (self.entity_id,)
         )
+        # Single bank account — can never be an internal transfer
+        if len(banks) <= 1:
+            return False
+
         bank_names = [
             (b.get("account_name") or "").lower().strip()
             for b in banks
             if len((b.get("account_name") or "").strip()) > 3
         ]
 
-        # Only match if the payee IS the bank name (whole word, payee field only)
-        payee_clean = payee.strip()
+        # Payee must exactly match one of the entity's OTHER bank account names
+        payee_clean = payee.lower().strip()
         for name in bank_names:
-            pattern = r'\b' + re.escape(name) + r'\b'
-            if re.fullmatch(re.escape(name), payee_clean, re.I):
+            if re.fullmatch(re.escape(name), payee_clean):
                 return True
-            # e.g. payee is "Transfer to Starling" — explicit transfer phrase + bank name
-            if re.search(r'\b(transfer|move)\b', payee_clean, re.I) and \
-               re.search(pattern, payee_clean, re.I):
+            # e.g. payee is "Transfer to Starling"
+            if re.search(r'\b(transfer|move)\b', payee_clean) and \
+               re.search(r'\b' + re.escape(name) + r'\b', payee_clean):
                 return True
 
-        # Explicit strong transfer phrases in description
-        combined = f"{payee} {desc}"
+        # Explicit strong phrases only
+        combined = f"{payee} {desc}".lower()
         strong_kw = ["internal transfer", "own account transfer",
                      "savings transfer", "bank transfer to ", "transfer to savings"]
         return any(kw in combined for kw in strong_kw)
