@@ -343,10 +343,27 @@ class ImportModel:
     def stage_transactions(entity_id: str, batch_id: str, rows: list) -> int:
         """
         rows: list of dicts with keys: date, amount, description, payee
-        Returns count of rows staged.
+        Returns count of rows staged. Skips exact duplicates already in staging or GL.
         """
         count = 0
+        skipped = 0
         for row in rows:
+            date   = str(row.get("date",""))[:10]
+            amount = float(row.get("amount", 0))
+            desc   = str(row.get("description","")).strip()
+            payee  = str(row.get("payee","")).strip()
+
+            # Deduplicate: same entity + date + amount + description already staged or in GL
+            existing = db.fetchone(
+                """SELECT 1 FROM transactions
+                   WHERE entity_id=? AND date=? AND amount=? AND description=?
+                   LIMIT 1""",
+                (entity_id, date, amount, desc)
+            )
+            if existing:
+                skipped += 1
+                continue
+
             try:
                 db.execute(
                     """INSERT INTO transactions
@@ -354,16 +371,14 @@ class ImportModel:
                         description,payee,source,status,created_at)
                        VALUES (?,?,?,?,?,?,?,'CSV_IMPORT','staged',?)""",
                     (_uid(), entity_id, batch_id,
-                     str(row.get("date",""))[:10],
-                     float(row.get("amount", 0)),
-                     str(row.get("description","")),
-                     str(row.get("payee","")),
-                     _now())
+                     date, amount, desc, payee, _now())
                 )
                 count += 1
             except Exception as exc:
                 log.warning("Skipped row during staging: %s — %s", row, exc)
         db.commit()
+        if skipped:
+            log.info("Deduplication: skipped %d duplicate transactions", skipped)
         return count
 
     @staticmethod
