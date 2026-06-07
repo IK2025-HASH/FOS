@@ -41,7 +41,10 @@ class CompanyPage(BasePage):
         )
         self.tbl.setFixedHeight(220)
         self.tbl.doubleClicked.connect(self._view_selected)
+        hint = QLabel("💡 Double-click a company to edit FY dates and settings")
+        hint.setStyleSheet(f"color:{MUTED}; font-size:11px; font-style:italic;")
         list_card.body().addWidget(self.tbl)
+        list_card.body().addWidget(hint)
         self.layout_.addWidget(list_card)
 
         # New company form (hidden until + New pressed)
@@ -68,9 +71,9 @@ class CompanyPage(BasePage):
         _months = ["January","February","March","April","May","June",
                    "July","August","September","October","November","December"]
         self.f_fy_start   = ComboField(_months)
-        self.f_fy_start.setCurrentText("April")   # UK default
+        self.f_fy_start.setCurrentText("March")
         self.f_fy_end     = ComboField(_months)
-        self.f_fy_end.setCurrentText("March")     # UK default
+        self.f_fy_end.setCurrentText("February")
 
         for lbl, w in [
             ("Legal Name *",       self.f_legal),
@@ -270,8 +273,8 @@ class CompanyPage(BasePage):
             error(self, "Error", str(exc))
 
     def _clear_form(self):
-        self.f_fy_start.setCurrentText("April")
-        self.f_fy_end.setCurrentText("March")
+        self.f_fy_start.setCurrentText("March")
+        self.f_fy_end.setCurrentText("February")
         self._bank_list.clear()
         self.tbl_banks.setRowCount(0)
         for w in [self.f_legal, self.f_trading, self.f_comp_no,
@@ -286,10 +289,88 @@ class CompanyPage(BasePage):
         row = self.tbl.currentRow()
         if row < 0:
             return
-        # Could open a detail dialog — placeholder for v2
-        info(self, "Company Profile",
-             f"Selected: {self.tbl.item(row,0).text()}\n\n"
-             "Full detail view coming in next sprint.")
+        legal_name = self.tbl.item(row, 0).text()
+        entities = EntityModel.list_all()
+        entity = next((e for e in entities if e["legal_name"] == legal_name), None)
+        if not entity:
+            return
+
+        from PyQt6.QtWidgets import QDialog, QDialogButtonBox
+        from ui.widgets import _DIALOG_SS
+
+        _months = ["January","February","March","April","May","June",
+                   "July","August","September","October","November","December"]
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle(f"Edit — {legal_name}")
+        dlg.setMinimumWidth(480)
+        dlg.setStyleSheet(f"QDialog {{ background:white; }} QLabel {{ color:{TEXT}; }}")
+        lay = QVBoxLayout(dlg)
+        lay.setSpacing(10)
+        lay.setContentsMargins(20, 20, 20, 20)
+
+        hdr = QLabel(f"<b>{legal_name}</b>")
+        hdr.setStyleSheet(f"font-size:14px; color:{DARK};")
+        lay.addWidget(hdr)
+
+        sep = QFrame(); sep.setFrameShape(QFrame.Shape.HLine)
+        sep.setStyleSheet(f"color:{BORDER};"); lay.addWidget(sep)
+
+        # FY fields
+        fy_lbl = QLabel("Financial Year"); fy_lbl.setStyleSheet(f"color:{MUTED}; font-size:11px; font-weight:bold;")
+        lay.addWidget(fy_lbl)
+
+        f_fy_start = ComboField(_months)
+        f_fy_start.setCurrentText(entity.get("fy_start") or "April")
+        f_fy_end = ComboField(_months)
+        f_fy_end.setCurrentText(entity.get("fy_end") or "March")
+
+        lay.addLayout(FormRow("FY Start Month *", f_fy_start))
+        lay.addLayout(FormRow("FY End Month *",   f_fy_end))
+
+        sep2 = QFrame(); sep2.setFrameShape(QFrame.Shape.HLine)
+        sep2.setStyleSheet(f"color:{BORDER};"); lay.addWidget(sep2)
+
+        # Trading name
+        f_trading = LineField(legal_name)
+        f_trading.setText(entity.get("trading_name") or "")
+        lay.addLayout(FormRow("Trading Name", f_trading))
+
+        # Status
+        f_status = ComboField(["Active", "Dormant", "Dissolved"])
+        f_status.setCurrentText(entity.get("status") or "Active")
+        lay.addLayout(FormRow("Status", f_status))
+
+        note = QLabel("Changes take effect immediately. FY change affects report filtering.")
+        note.setStyleSheet(f"color:{MUTED}; font-size:11px;")
+        note.setWordWrap(True)
+        lay.addWidget(note)
+
+        btns = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save |
+            QDialogButtonBox.StandardButton.Cancel
+        )
+        btns.setStyleSheet(_DIALOG_SS)
+        btns.accepted.connect(dlg.accept)
+        btns.rejected.connect(dlg.reject)
+        lay.addWidget(btns)
+
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            try:
+                from core.database import db
+                db.execute(
+                    "UPDATE entities SET fy_start=?, fy_end=?, trading_name=?, status=?, updated_at=? WHERE entity_id=?",
+                    (f_fy_start.currentText(), f_fy_end.currentText(),
+                     f_trading.text().strip() or None,
+                     f_status.currentText(),
+                     __import__('datetime').datetime.utcnow().isoformat(),
+                     entity["entity_id"])
+                )
+                db.commit()
+                self.refresh()
+                info(self, "Saved", "Company profile updated.")
+            except Exception as exc:
+                error(self, "Error", str(exc))
 
     def refresh(self):
         self.tbl.setRowCount(0)

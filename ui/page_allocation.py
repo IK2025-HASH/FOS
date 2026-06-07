@@ -129,9 +129,12 @@ class AllocationPage(BasePage):
         self.cbo_entity.currentIndexChanged.connect(self._load)
 
         top = QHBoxLayout()
+        self.btn_rerun = PrimaryButton("🤖  Re-run AI Allocation")
+        self.btn_rerun.clicked.connect(self._rerun_ai)
         self.btn_refresh = SecondaryButton("⟳  Refresh")
         self.btn_refresh.clicked.connect(self._load)
         top.addStretch()
+        top.addWidget(self.btn_rerun)
         top.addWidget(self.btn_refresh)
         self.layout_.addLayout(top)
 
@@ -311,6 +314,29 @@ class AllocationPage(BasePage):
             self.cbo_entity.addItem("— no companies yet —")
         self.cbo_entity.blockSignals(False)
         self._load()
+
+    def _rerun_ai(self):
+        entity_id = self._current_entity_id()
+        if not entity_id:
+            return
+        from core.ai_engine import AllocationEngine
+        try:
+            self.btn_rerun.setEnabled(False)
+            self.btn_rerun.setText("🤖  Running…")
+            engine = AllocationEngine(entity_id)
+            engine.train()
+            staged = ImportModel.get_staged(entity_id)
+            if not staged:
+                info(self, "Nothing to do", "No staged transactions to allocate.")
+                return
+            engine.allocate_batch(staged)
+            self._load()
+            info(self, "Done", f"AI re-allocation complete — {len(staged)} transactions updated.")
+        except Exception as exc:
+            error(self, "Error", str(exc))
+        finally:
+            self.btn_rerun.setEnabled(True)
+            self.btn_rerun.setText("🤖  Re-run AI Allocation")
 
     def _load(self):
         entity_id = self._current_entity_id()
