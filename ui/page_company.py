@@ -40,7 +40,7 @@ class CompanyPage(BasePage):
             ["Legal Name", "Trading Name", "Type", "FY Start", "FY End", "Status"], stretch_col=0
         )
         self.tbl.setFixedHeight(220)
-        self.tbl.doubleClicked.connect(self._view_selected)
+        self.tbl.doubleClicked.connect(lambda _: self._view_selected())
         hint = QLabel("💡 Double-click a company to edit FY dates and settings")
         hint.setStyleSheet(f"color:{MUTED}; font-size:11px; font-style:italic;")
         list_card.body().addWidget(self.tbl)
@@ -285,11 +285,14 @@ class CompanyPage(BasePage):
             w.clear()
         self.f_vat_reg.setChecked(False)
 
-    def _view_selected(self):
+    def _view_selected(self, index=None):
         row = self.tbl.currentRow()
         if row < 0:
             return
-        legal_name = self.tbl.item(row, 0).text()
+        item = self.tbl.item(row, 0)
+        if not item:
+            return
+        legal_name = item.text()
         entities = EntityModel.list_all()
         entity = next((e for e in entities if e["legal_name"] == legal_name), None)
         if not entity:
