@@ -353,10 +353,11 @@ class ImportModel:
             desc   = str(row.get("description","")).strip()
             payee  = str(row.get("payee","")).strip()
 
-            # Deduplicate: same entity + date + amount + description already staged or in GL
+            # Deduplicate: skip only if already staged — committed rows are in GL, safe to re-stage
             existing = db.fetchone(
                 """SELECT 1 FROM transactions
                    WHERE entity_id=? AND date=? AND amount=? AND description=?
+                   AND status='staged'
                    LIMIT 1""",
                 (entity_id, date, amount, desc)
             )
