@@ -244,12 +244,17 @@ class CoAModel:
     @staticmethod
     def seed_standard(entity_id: str) -> None:
         for row in STANDARD_COA:
+            # Insert if missing, then always force active=1 on standard accounts
             db.execute(
                 """INSERT OR IGNORE INTO coa
                    (account_id,entity_id,code,name,type,normal_balance,
                     vat_applicable,vat_rate,system_locked,active)
                    VALUES (?,?,?,?,?,?,?,?,?,1)""",
                 (_uid(), entity_id, *row)
+            )
+            db.execute(
+                "UPDATE coa SET active=1 WHERE entity_id=? AND code=?",
+                (entity_id, row[0])
             )
         db.commit()
         log.info("Standard CoA seeded for entity %s (%d accounts)", entity_id, len(STANDARD_COA))

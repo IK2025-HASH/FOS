@@ -346,13 +346,14 @@ class AllocationPage(BasePage):
         # Auto re-run AI on every load so latest rules always apply
         try:
             from core.ai_engine import AllocationEngine
+            import logging
             engine = AllocationEngine(entity_id)
             engine.train()
             staged_raw = ImportModel.get_staged(entity_id)
             if staged_raw:
                 engine.allocate_batch(staged_raw)
-        except Exception:
-            pass  # never block the UI for AI errors
+        except Exception as _ai_err:
+            logging.getLogger(__name__).warning("AI re-run failed: %s", _ai_err, exc_info=True)
 
         coa_rows = CoAModel.get_for_entity(entity_id)
         self._coa_map = {r["code"]: r["name"] for r in coa_rows}

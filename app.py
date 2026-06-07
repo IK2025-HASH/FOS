@@ -52,6 +52,26 @@ def main():
     font = QFont("Segoe UI", 10)
     app.setFont(font)
 
+    # Global stylesheet — enforce dark text on all widgets to prevent
+    # white-on-white contrast issues on Windows
+    app.setStyleSheet("""
+        QWidget          { color: #2C3E50; }
+        QLabel           { color: #2C3E50; }
+        QLineEdit        { color: #2C3E50; background: white; }
+        QComboBox        { color: #2C3E50; background: white; }
+        QTextEdit        { color: #2C3E50; background: white; }
+        QTableWidget     { color: #2C3E50; }
+        QGroupBox        { color: #1B3A5C; }
+        QCheckBox        { color: #2C3E50; }
+        QDialogButtonBox { color: #2C3E50; }
+        QMessageBox      { background: white; }
+        QMessageBox QLabel { color: #2C3E50; }
+        QScrollBar:vertical { background: #F4F7FB; width: 8px; border-radius: 4px; }
+        QScrollBar::handle:vertical { background: #B0BEC5; border-radius: 4px; min-height: 20px; }
+        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; }
+        QToolTip { background: #1B3A5C; color: white; border: none; padding: 4px; }
+    """)
+
     # ── Dev mode: skip password, auto-open (delete corrupt db if needed) ─────
     DEV_MODE = True   # set False when ready for production password prompt
     DEV_PASSWORD = "devpass"   # sqlcipher requires at least 1 character
