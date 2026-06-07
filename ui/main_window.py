@@ -92,6 +92,7 @@ class MainWindow(QMainWindow):
             ("gl",         "📒  General Ledger"),
             ("tb",         "⚖️   Trial Balance"),
             ("reports",    "📄  Period Report"),
+            ("datatools",  "🔧  Data Tools"),
         ]
         for key, label in nav_items:
             btn = self._make_nav_btn(label, key)
