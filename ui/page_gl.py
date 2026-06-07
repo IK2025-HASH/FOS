@@ -101,11 +101,14 @@ def _get_tb_filtered(entity_id: str, fy_periods) -> list:
 
 
 def _export_table(parent, rows: list, headers: list, fmt: str, default_name: str):
-    from PyQt6.QtWidgets import QFileDialog, QMessageBox
+    from PyQt6.QtWidgets import QFileDialog
+    from pathlib import Path
     ext_map = {"CSV": "csv", "Excel": "xlsx", "PDF": "pdf"}
     ext = ext_map.get(fmt, "csv")
+    # Default to user's Desktop so the path always exists
+    desktop = str(Path.home() / "Desktop" / f"{default_name}.{ext}")
     path, _ = QFileDialog.getSaveFileName(
-        parent, f"Export {fmt}", default_name, f"{fmt} Files (*.{ext})"
+        parent, f"Export {fmt}", desktop, f"{fmt} Files (*.{ext})"
     )
     if not path:
         return
