@@ -268,10 +268,48 @@ class ImportPage(BasePage):
         self._check_ready()
 
     def _add_files(self):
+        from core.database import db as _db
         bank_name = self.cbo_bank.currentText().strip()
         if not bank_name or bank_name.startswith("—"):
             error(self, "No Bank Selected", "Please select or type a bank name first.")
             return
+
+        entity_id = self._current_entity_id()
+
+        # Check this bank belongs to the current entity, not another company
+        if entity_id:
+            other_entities = _db.fetchall(
+                """SELECT e.legal_name FROM entity_banks eb
+                   JOIN entities e ON e.entity_id = eb.entity_id
+                   WHERE eb.entity_id != ? AND LOWER(eb.account_name) = LOWER(?)""",
+                (entity_id, bank_name)
+            )
+            if other_entities:
+                other_names = ", ".join(r["legal_name"] for r in other_entities)
+                if not confirm(self, "⚠ Wrong Company?",
+                               f"'{bank_name}' is registered to {other_names}, "
+                               f"not the currently active company.\n\n"
+                               f"Importing these files will post transactions to the WRONG company.\n\n"
+                               f"Are you sure you want to continue?"):
+                    return
+
+            # Warn if bank not registered for this entity at all
+            known = _db.fetchone(
+                "SELECT 1 FROM entity_banks WHERE entity_id=? AND LOWER(account_name)=LOWER(?)",
+                (entity_id, bank_name)
+            )
+            if not known:
+                from core.database import db as _db2
+                entity_name = _db2.fetchone(
+                    "SELECT legal_name FROM entities WHERE entity_id=?", (entity_id,)
+                )
+                ename = entity_name["legal_name"] if entity_name else "this company"
+                if not confirm(self, "Bank Not Registered",
+                               f"'{bank_name}' is not registered as a bank for {ename}.\n\n"
+                               f"Make sure you have selected the correct company in the sidebar.\n\n"
+                               f"Continue anyway?"):
+                    return
+
         fps, _ = QFileDialog.getOpenFileNames(
             self, f"Select Files for {bank_name}",
             "", "Bank Statements (*.csv *.xlsx *.xls *.pdf);;All Files (*)"

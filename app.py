@@ -140,15 +140,20 @@ def main():
                 _name = (_ob.get("account_name") or "").strip()
                 if _name:
                     _other_banks.append(f"[{_name}]")
-        # Delete GL rows for this entity whose description starts with another entity's bank prefix
+        # Delete GL rows and approved transactions for this entity whose description
+        # starts with another entity's bank prefix
         for _pfx in _other_banks:
-            _deleted = _db.execute(
+            _del_gl = _db.execute(
                 "DELETE FROM gl WHERE entity_id=? AND description LIKE ?",
                 (_eid, f"{_pfx}%")
             ).rowcount
-            if _deleted:
-                log.info("Removed %d cross-company GL entries (%s) from entity %s",
-                         _deleted, _pfx, _eid)
+            _del_tx = _db.execute(
+                "DELETE FROM transactions WHERE entity_id=? AND description LIKE ? AND status='approved'",
+                (_eid, f"{_pfx}%")
+            ).rowcount
+            if _del_gl or _del_tx:
+                log.info("Removed %d GL + %d tx cross-company entries (%s) from entity %s",
+                         _del_gl, _del_tx, _pfx, _eid)
         # Deduplicate GL entries (keep lowest gl_id per unique combination)
         _db.execute("""
             DELETE FROM gl
