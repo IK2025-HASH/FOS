@@ -22,7 +22,7 @@ if errorlevel 1 (
     echo  Install Git from https://git-scm.com if you want auto-updates.
     echo.
 ) else (
-    git pull origin claude/exciting-brahmagupta-lpIMW
+    git pull origin claude/al-khwarizmi
     if errorlevel 1 (
         echo  WARNING: Could not pull latest code. Running with current version.
         echo.
@@ -47,7 +47,7 @@ echo.
 
 REM ── Install / update dependencies ────────────────────────────────────────
 echo  Installing dependencies (skipped if already up to date)...
-pip install --quiet PyQt6 pandas openpyxl pdfplumber scikit-learn cryptography
+pip install --quiet PyQt6 pandas openpyxl pdfplumber scikit-learn cryptography reportlab
 
 REM ── SQLCipher (encrypted DB) — optional, graceful fallback ───────────────
 pip install --quiet sqlcipher3-binary >nul 2>&1
