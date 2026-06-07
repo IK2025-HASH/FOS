@@ -13,7 +13,7 @@ from PyQt6.QtCore import Qt
 from ui.widgets import (
     BasePage, Card, PrimaryButton, SecondaryButton,
     ComboField, make_table, set_row,
-    info, error, ACCENT, DARK, TEXT, MUTED, WHITE, BG
+    info, error, confirm, ACCENT, DARK, TEXT, MUTED, WHITE, BG
 )
 from core.models import EntityModel, CoAModel
 from core.file_parser import parse_file
