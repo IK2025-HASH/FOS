@@ -103,9 +103,20 @@ class MainWindow(QMainWindow):
 
         self.lbl_version = QLabel("v1.1")
         self.lbl_version.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.lbl_version.setFixedHeight(36)
+        self.lbl_version.setFixedHeight(28)
         self.lbl_version.setStyleSheet("color:#506070; font-size:9px; background:#16314F;")
         sb_layout.addWidget(self.lbl_version)
+
+        import core.settings as _s
+        self.lbl_app_mode = QLabel("🟢 TESTING" if _s.is_testing() else "🔴 LIVE")
+        self.lbl_app_mode.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lbl_app_mode.setFixedHeight(24)
+        self.lbl_app_mode.setStyleSheet(
+            "color:#A8D5A2; font-size:9px; font-weight:bold; background:#16314F;"
+            if _s.is_testing() else
+            "color:#F5A9A9; font-size:9px; font-weight:bold; background:#16314F;"
+        )
+        sb_layout.addWidget(self.lbl_app_mode)
 
         root.addWidget(self.sidebar)
 
