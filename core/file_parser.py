@@ -160,8 +160,19 @@ def _detect_and_normalise(df: pd.DataFrame, warnings: list) -> tuple:
 def _normalise_df(df: pd.DataFrame, mapping: dict, bank: str, warnings: list) -> pd.DataFrame:
     out = pd.DataFrame()
 
-    # Date
-    out["date"] = pd.to_datetime(df[mapping["date"]], dayfirst=True, errors="coerce")
+    # Date — try explicit UK formats first, then fall back to dayfirst inference
+    raw_dates = df[mapping["date"]].astype(str).str.strip()
+    parsed = None
+    for fmt in ("%d/%m/%Y", "%d-%m-%Y", "%d/%m/%y", "%d-%m-%y",
+                "%Y-%m-%d", "%d %b %Y", "%d %B %Y"):
+        try:
+            parsed = pd.to_datetime(raw_dates, format=fmt, errors="raise")
+            break
+        except Exception:
+            continue
+    if parsed is None:
+        parsed = pd.to_datetime(raw_dates, dayfirst=True, errors="coerce")
+    out["date"] = parsed
 
     # Description
     out["description"] = df.get(mapping.get("desc",""), "").fillna("").astype(str)
