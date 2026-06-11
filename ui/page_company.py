@@ -339,6 +339,12 @@ class CompanyPage(BasePage):
         f_trading.setText(entity.get("trading_name") or "")
         lay.addLayout(FormRow("Trading Name", f_trading))
 
+        # VAT registered
+        f_vat = QCheckBox("VAT Registered")
+        f_vat.setStyleSheet(f"color:{TEXT}; font-size:13px;")
+        f_vat.setChecked(bool(entity.get("vat_registered", 1)))
+        lay.addLayout(FormRow("VAT", f_vat))
+
         # Status
         f_status = ComboField(["Active", "Dormant", "Dissolved"])
         f_status.setCurrentText(entity.get("status") or "Active")
@@ -362,10 +368,11 @@ class CompanyPage(BasePage):
             try:
                 from core.database import db
                 db.execute(
-                    "UPDATE entities SET fy_start=?, fy_end=?, trading_name=?, status=?, updated_at=? WHERE entity_id=?",
+                    "UPDATE entities SET fy_start=?, fy_end=?, trading_name=?, status=?, vat_registered=?, updated_at=? WHERE entity_id=?",
                     (f_fy_start.currentText(), f_fy_end.currentText(),
                      f_trading.text().strip() or None,
                      f_status.currentText(),
+                     1 if f_vat.isChecked() else 0,
                      __import__('datetime').datetime.utcnow().isoformat(),
                      entity["entity_id"])
                 )

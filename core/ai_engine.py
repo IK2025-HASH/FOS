@@ -111,6 +111,8 @@ class AllocationEngine:
         self._coa: dict = {}        # code → type
         self._rules: list = []      # from rule_library table
         self._ml_model = None       # lazy-loaded
+        e = db.fetchone("SELECT vat_registered FROM entities WHERE entity_id=?", (entity_id,))
+        self._vat_registered = bool(e["vat_registered"]) if e else True
         self._refresh()
 
     # ── Public interface ──────────────────────────────────────────────────────
@@ -277,6 +279,8 @@ class AllocationEngine:
     def _result(self, tx_id, account_code, vat_code, confidence,
                 method, rule_id=None) -> dict:
         import uuid
+        if not self._vat_registered:
+            vat_code = "OS"
         return {
             "alloc_id":     str(uuid.uuid4()),
             "tx_id":        tx_id,

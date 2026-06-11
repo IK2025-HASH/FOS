@@ -594,12 +594,16 @@ class ReportsPage(BasePage):
         profit_row.setStyleSheet(f"background:#F0F4F8; border-radius:6px; border:none;")
         pr_lay = QHBoxLayout(profit_row)
         pr_lay.setContentsMargins(12, 8, 12, 8)
-        for label, val, colour in [
-            ("Total Income", r["total_income"], SUCCESS),
-            ("Total Expenses", r["total_expenses"], DANGER),
-            ("Net Profit / Loss", r["net_profit"], SUCCESS if r["net_profit"] >= 0 else DANGER),
-            ("Total VAT", r["total_vat"], ACCENT),
-        ]:
+        e = EntityModel.get(self._entity_id)
+        show_vat = bool(e.get("vat_registered", 1)) if e else True
+        summary_items = [
+            ("Total Income",    r["total_income"],  SUCCESS),
+            ("Total Expenses",  r["total_expenses"], DANGER),
+            ("Net Profit / Loss", r["net_profit"],  SUCCESS if r["net_profit"] >= 0 else DANGER),
+        ]
+        if show_vat:
+            summary_items.append(("Total VAT", r["total_vat"], ACCENT))
+        for label, val, colour in summary_items:
             col = QVBoxLayout()
             col.setSpacing(2)
             vl = QLabel(f"£{val:,.2f}")
@@ -609,7 +613,7 @@ class ReportsPage(BasePage):
             col.addWidget(vl)
             col.addWidget(ll)
             pr_lay.addLayout(col)
-            if label != "Total VAT":
+            if label != summary_items[-1][0]:
                 sep = QFrame()
                 sep.setFrameShape(QFrame.Shape.VLine)
                 sep.setStyleSheet(f"color:{BORDER}; border:none;")

@@ -404,6 +404,8 @@ class ImportModel:
         """
         approval_id = _uid()
         now = _now()
+        entity = db.fetchone("SELECT vat_registered FROM entities WHERE entity_id=?", (entity_id,))
+        vat_registered = bool(entity["vat_registered"]) if entity else True
 
         gl_rows = []
         for d in tx_decisions:
@@ -411,8 +413,9 @@ class ImportModel:
             if not tx:
                 continue
             amount = float(tx["amount"])
-            vat_rate = _vat_rate_for_code(d["vat_code"])
-            vat_amount = round(abs(amount) * vat_rate / (1 + vat_rate), 2) if vat_rate > 0 else 0.0
+            effective_vat_code = "OS" if not vat_registered else d["vat_code"]
+            vat_rate = _vat_rate_for_code(effective_vat_code)
+            vat_amount = round(abs(amount) * vat_rate / (1 + vat_rate), 2) if (vat_rate > 0 and vat_registered) else 0.0
             abs_amt = abs(amount)
             period  = _period(tx["date"])
 
@@ -429,7 +432,7 @@ class ImportModel:
             gl_rows.append((_uid(), entity_id, d["account_code"], tx["date"],
                              tx["description"],
                              exp_debit, exp_credit,
-                             d["vat_code"], vat_amount,
+                             effective_vat_code, vat_amount,
                              tx["source"], tx["batch_id"], approval_id, period, 0))
 
             # Bank counterpart line (always OS / no VAT on bank movement)

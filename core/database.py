@@ -243,6 +243,17 @@ class Database:
         for stmt in stmts:
             self._conn.execute(stmt)
         self._conn.commit()
+
+        # ── Migrations (safe to re-run) ───────────────────────────────────────
+        migrations = [
+            "ALTER TABLE entities ADD COLUMN vat_registered INTEGER NOT NULL DEFAULT 1",
+        ]
+        for m in migrations:
+            try:
+                self._conn.execute(m)
+                self._conn.commit()
+            except Exception:
+                pass  # column already exists
         log.info("Schema initialised")
 
 
